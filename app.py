@@ -1,33 +1,3 @@
-## TODOS
-
-# app protocols to open apps
-## go [name]
-
-# Multi search - DONE need to add links
-## go wiki ""
-## go define ""
-## go weather "cheltenham"
-## go maps "cheltenham" -> directions
-
-# extra go links:
-## dailys [list]
-## go files or folders
-## milks
-## cvs
-## wheel
-### overleaf
-### pdf
-## applications [list] [web]
-## easter eggs
-### go gamble
-### go roll "x" / go flip
-
-# dns
-# export / import (db)
-# dockeur on ds
-# browser extension
-# load html from other files very simply
-
 from __future__ import annotations
 
 import sqlite3
