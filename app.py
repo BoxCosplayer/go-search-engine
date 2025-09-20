@@ -69,7 +69,7 @@ def _make_tray_image():
     return img
 
 
-def _base_dir():    # if running as a PyInstaller EXE, use the folder containing the executable
+def _base_dir() -> str:    # if running as a PyInstaller EXE, use the folder containing the executable
     if getattr(sys, "frozen", False):
         return os.path.dirname(sys.executable)
     return os.path.dirname(__file__)
@@ -125,16 +125,6 @@ def _open_file(path: str) -> None:
         subprocess.Popen(["open", path])
     else:
         subprocess.Popen(["xdg-open", path])
-
-
-def load_config():
-    # Optional JSON file with defaults
-    cfg_path = os.environ.get("GO_CONFIG_PATH") or _resource_path("config.json")
-    try:
-        with open(cfg_path, "r", encoding="utf-8") as f:
-            return json.load(f) or {}
-    except Exception:
-        return {}
     
 def _to_slug(s: str) -> str:
     try:
@@ -160,6 +150,15 @@ def _sanitize_query(raw: str) -> str:
     # strip trailing punctuation (one or more)
     q = _TRAILING_PUNCT_RE.sub("", q)
     return q
+
+def load_config():
+    # Optional JSON file with defaults
+    cfg_path = os.environ.get("GO_CONFIG_PATH") or _resource_path("config.json")
+    try:
+        with open(cfg_path, "r", encoding="utf-8") as f:
+            return json.load(f) or {}
+    except Exception:
+        return {}
 
 DB_PATH = os.environ.get("GO_DB_PATH", os.path.join(os.path.dirname(__file__), "data", "links.db"))
 FALLBACK_URL_TEMPLATE = os.environ.get("GO_FALLBACK_URL_TEMPLATE", "")  # e.g. "https://duckduckgo.com/?q={q}"
