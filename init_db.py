@@ -17,7 +17,12 @@ try:
     from backend.app.db import DB_PATH, ensure_lists_schema  # type: ignore
 except Exception:
     # Fallback to repo-local data folder
-    DB_PATH = os.environ.get("GO_DB_PATH", os.path.join(os.path.dirname(__file__), "backend", "app", "data", "links.db"))
+    DB_PATH = os.environ.get("GO_DB_PATH", os.path.join(os.path.dirname(__file__), 
+                                                        "backend", 
+                                                        "app", 
+                                                        "data", 
+                                                        "links.db"
+                                                        ))
     def ensure_lists_schema(conn):
         conn.execute("""
         CREATE TABLE IF NOT EXISTS lists (

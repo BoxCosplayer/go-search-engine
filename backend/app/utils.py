@@ -44,8 +44,7 @@ def sanitize_query(raw: str) -> str:
     q = raw.strip()
     if (len(q) >= 2) and ((q[0], q[-1]) in {('"', '"'), ("'", "'"), ("`", "`")}):
         q = q[1:-1].strip()
-    q = _TRAILING_PUNCT_RE.sub("", q)
-    return q
+    return _TRAILING_PUNCT_RE.sub("", q)
 
 
 def to_slug(s: str) -> str:
@@ -62,7 +61,8 @@ def file_url_to_path(url: str) -> str:
         raise ValueError("not a file URL")
     path = url2pathname(u.path or "")
     if u.netloc and u.netloc.lower() not in ("", "localhost"):
-        path = r"\\%s%s" % (u.netloc, path.replace("/", "\\"))
+        # Build UNC path: \\server\share\path using f-string
+        path = f"\\\\{u.netloc}{path.replace('/', '\\')}"
     return os.path.normpath(path)
 
 

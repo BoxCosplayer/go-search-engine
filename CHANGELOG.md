@@ -1,5 +1,9 @@
 Changelog
 
+## 0.1.3
+
+- Ruff formatting
+
 ## 0.1.2
 
 - Fixed redirects
