@@ -1,0 +1,62 @@
+
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>go â€“ {{list['name']}}</title>
+<style>
+:root{--bg:#0d1117;--panel:#161b22;--text:#c9d1d9;--muted:#8b949e;--border:#30363d;--accent:#58a6ff;--danger:#f85149}
+*{box-sizing:border-box} html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Arial;
+     line-height:1.5;display:grid;place-items:center;padding:2rem 1rem;text-align:center}
+a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+.wrap{width:min(900px,100%)}
+h1{margin:0 0 .25rem} .meta{color:var(--muted)}
+.header-actions{margin:.5rem 0;display:flex;gap:.5rem;justify-content:center}
+.btn{font-size:.95rem;padding:.45rem .8rem;border-radius:8px;border:1px solid var(--border);cursor:pointer;background:var(--panel);color:var(--text)}
+.btn-danger{background:var(--danger);border-color:transparent;color:#fff}
+.filter{display:inline-block;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:.6rem .8rem;margin:.75rem 0}
+.filter input{width:min(26rem,90vw);background:#0b1320;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:.55rem .75rem}
+table{width:100%;border-collapse:collapse;margin:.5rem auto 0;background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+th,td{padding:.75rem .5rem;border-bottom:1px solid var(--border);text-align:center}
+thead th{color:var(--muted);font-weight:600;background:rgba(255,255,255,.02)}
+tbody tr:nth-child(even) td{background:rgba(255,255,255,.02)}
+.hidden{display:none!important}
+</style></head><body>
+<div class="wrap">
+  <h1>{{list['name']}}</h1>
+  {% if list['description'] %}<div class="meta">{{list['description']}}</div>{% endif %}
+
+  <div class="header-actions">
+    <a class="btn" href="/lists">All lists</a>
+    <form action="/admin/list-delete" method="post" onsubmit="return confirm('Delete list {{ list['name'] }}? This only removes the list and its associations, not your links.');">
+      <input type="hidden" name="slug" value="{{ list['slug'] }}">
+      <button class="btn btn-danger" type="submit">Delete list</button>
+    </form>
+  </div>
+
+  <div class="filter"><input id="q" type="text" placeholder="Filter linksâ€¦"></div>
+  <div class="meta" id="count"></div>
+
+  <table>
+    <thead><tr><th>Keyword</th><th>Title</th><th>URL</th></tr></thead>
+    <tbody id="body">
+      {% for r in rows %}
+        <tr data-hay="{{ (r['keyword'] ~ ' ' ~ (r['title'] or '') ~ ' ' ~ r['url']).lower() }}">
+          <td><code>{{r['keyword']}}</code></td>
+          <td>{{r['title'] or ''}}</td>
+          <td><a href="{{r['url']}}">{{r['url']}}</a></td>
+        </tr>
+      {% endfor %}
+      <tr id="noRows" class="hidden"><td colspan="3" class="meta">No matches.</td></tr>
+    </tbody>
+  </table>
+
+  <p class="meta" style="margin-top:.75rem"><a href="/">Home</a> Â· <a href="/admin">Admin</a></p>
+</div>
+<script>
+(function(){
+  const q=document.getElementById('q'), tbody=document.getElementById('body'), rows=[...tbody.querySelectorAll('tr')].filter(tr=>tr.id!=='noRows'), no=document.getElementById('noRows'), cnt=document.getElementById('count');
+  function f(){ const v=(q.value||'').toLowerCase().trim(); let n=0; for(const tr of rows){const ok=!v||tr.dataset.hay.includes(v); tr.classList.toggle('hidden',!ok); if(ok)n++;} no.classList.toggle('hidden',n!==0); cnt.textContent = v?`Showing ${n} of ${rows.length}`:`${rows.length} total`; }
+  let t; q.addEventListener('input',()=>{clearTimeout(t);t=setTimeout(f,60)}); f();
+})();
+</script>
+</body></html>

@@ -1,0 +1,24 @@
+line-length = 100
+target-version = "py311"
+src = ["backend"]
+
+[lint]
+select = [
+  "E",   # pycodestyle errors
+  "F",   # pyflakes
+  "I",   # isort
+  "UP",  # pyupgrade
+  "B",   # flake8-bugbear
+  "RET", # return-related rules
+  "SIM", # simplify
+]
+ignore = []
+
+[format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+
+[lint.per-file-ignores]
+"*/__init__.py" = ["F401"]
+

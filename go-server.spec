@@ -1,11 +1,15 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+from PyInstaller.utils.hooks import collect_data_files
+
+# Include Jinja templates for Flask
+tmpl_datas = collect_data_files('backend.app', includes=['templates/*.html', 'templates/**/*.html'])
 
 a = Analysis(
     ['app.py'],
     pathex=[],
     binaries=[],
-    datas=[('config.json', '.')],
+    datas=[('config.json', '.')] + tmpl_datas,
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

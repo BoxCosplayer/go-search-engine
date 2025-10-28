@@ -1,0 +1,42 @@
+
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>go â€“ Lists</title>
+<style>
+:root{--bg:#0d1117;--panel:#161b22;--text:#c9d1d9;--muted:#8b949e;--border:#30363d;--accent:#58a6ff;--danger:#f85149}
+*{box-sizing:border-box} html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Arial;
+     line-height:1.5;display:grid;place-items:start center;padding:2rem 1rem;text-align:center}
+a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+.wrap{width:min(900px,100%)}
+h1{margin:0 0 .75rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:.75rem;margin-top:1rem}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:.9rem;display:flex;flex-direction:column;gap:.4rem}
+.name{font-weight:600}
+.count{color:var(--muted);font-size:.95rem}
+.meta{margin-top:.25rem;color:var(--muted)}
+.actions{display:flex;gap:.5rem;justify-content:center;margin-top:.4rem}
+.btn{font-size:0.95rem;padding:.45rem .8rem;border-radius:8px;border:1px solid var(--border);cursor:pointer}
+.btn-danger{background:var(--danger);color:#fff;border-color:transparent}
+</style></head><body>
+<div class="wrap">
+  <h1>Lists</h1>
+  <div class="grid">
+    {% for li in lists %}
+      <div class="card">
+        <a class="name" href="/lists/{{li['slug']}}">{{li['name']}}</a>
+        <div class="count">{{li['count']}} link{{ '' if li['count']==1 else 's' }}</div>
+        {% if li['description'] %}<div class="meta">{{li['description']}}</div>{% endif %}
+        <div class="actions">
+          <form action="/admin/list-delete" method="post" onsubmit="return confirm('Delete list {{ li['name'] }}? This only removes the list and its associations, not your links.');">
+            <input type="hidden" name="slug" value="{{ li['slug'] }}">
+            <button class="btn btn-danger" type="submit">Delete</button>
+          </form>
+        </div>
+      </div>
+    {% endfor %}
+    {% if not lists %}<p class="meta" style="grid-column:1/-1">No lists yet. Create one in Admin.</p>{% endif %}
+  </div>
+  <p class="meta" style="margin-top:1rem"><a href="/">Home</a> Â· <a href="/admin">Admin</a></p>
+</div>
+</body></html>

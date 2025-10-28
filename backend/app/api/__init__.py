@@ -1,0 +1,79 @@
+from flask import Blueprint, request
+
+from ..db import ensure_lists_schema, get_db, init_db
+from ..utils import to_slug
+
+api_bp = Blueprint("api", __name__)
+
+
+@api_bp.route("/links", methods=["GET", "POST"])
+def links():
+    db = get_db()
+    if request.method == "POST":
+        data = request.get_json(silent=True) or {}
+        keyword = (data.get("keyword") or "").strip()
+        url = (data.get("url") or "").strip()
+        title = (data.get("title") or "").strip() or None
+        if not keyword or not url:
+            return {"error": "keyword and url are required"}, 400
+        if not (url.startswith("http://") or url.startswith("https://")):
+            return {"error": "url must start with http:// or https://"}, 400
+        init_db()
+        ensure_lists_schema(get_db())
+        try:
+            db.execute(
+                "INSERT INTO links(keyword, url, title) VALUES (?, ?, ?)", (keyword, url, title)
+            )
+            db.commit()
+        except Exception:
+            return {"error": f"keyword '{keyword}' already exists"}, 400
+        return {"ok": True}
+
+    rows = db.execute(
+        "SELECT keyword, title, url FROM links ORDER BY keyword COLLATE NOCASE"
+    ).fetchall()
+    return {"links": [dict(r) for r in rows]}
+
+
+@api_bp.route("/lists", methods=["GET", "POST"])
+def lists():
+    db = get_db()
+    ensure_lists_schema(db)
+    if request.method == "POST":
+        data = request.get_json(force=True)
+        slug = (data.get("slug") or "").strip()
+        name = (data.get("name") or "").strip()
+        desc = (data.get("description") or "").strip() or None
+        if not slug and not name:
+            return {"error": "slug or name required"}, 400
+        if not slug:
+            slug = to_slug(name)
+        if not name:
+            name = slug.replace("-", " ").title()
+        try:
+            db.execute(
+                "INSERT INTO lists(slug,name,description) VALUES (?,?,?)", (slug, name, desc)
+            )
+            db.commit()
+        except Exception:
+            return {"error": "slug exists"}, 400
+
+        # Create a link to the list
+        base_url = request.host_url.rstrip("/")
+        list_url = f"{base_url}/lists/{slug}"
+        title = f"List - {name}"
+
+        try:
+            db.execute(
+                "INSERT INTO links(keyword, url, title) VALUES (?, ?, ?)", (slug, list_url, title)
+            )
+            db.commit()
+        except Exception:
+            pass
+
+        return {"ok": True}
+
+    rows = db.execute(
+        "SELECT slug,name,description FROM lists ORDER BY name COLLATE NOCASE"
+    ).fetchall()
+    return {"lists": [dict(r) for r in rows]}

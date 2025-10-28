@@ -7,9 +7,36 @@ Usage:
 CSV format:
   keyword,title,url
 """
-import csv, os, sqlite3, sys
+import csv
+import os
+import sqlite3
+import sys
 
-DB_PATH = os.environ.get("GO_DB_PATH", os.path.join(os.path.dirname(__file__), "data", "links.db"))
+# Use the same default DB location as the app
+try:
+    from backend.app.db import DB_PATH, ensure_lists_schema  # type: ignore
+except Exception:
+    # Fallback to repo-local data folder
+    DB_PATH = os.environ.get("GO_DB_PATH", os.path.join(os.path.dirname(__file__), "backend", "app", "data", "links.db"))
+    def ensure_lists_schema(conn):
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS lists (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          slug TEXT NOT NULL UNIQUE,
+          name TEXT NOT NULL,
+          description TEXT
+        );
+        """)
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS link_lists (
+          link_id INTEGER NOT NULL,
+          list_id INTEGER NOT NULL,
+          PRIMARY KEY (link_id, list_id),
+          FOREIGN KEY (link_id) REFERENCES links(id) ON DELETE CASCADE,
+          FOREIGN KEY (list_id) REFERENCES lists(id) ON DELETE CASCADE
+        );
+        """)
+        conn.commit()
 
 def ensure_schema(conn):
     conn.execute("""
@@ -40,9 +67,11 @@ def import_csv(conn, path):
     conn.commit()
 
 def main():
-    os.makedirs(os.path.join(os.path.dirname(__file__), "data"), exist_ok=True)
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     with sqlite3.connect(DB_PATH) as conn:
         ensure_schema(conn)
+        # Also ensure lists schema so admin/lists UIs work out-of-the-box
+        ensure_lists_schema(conn)
 
         if len(sys.argv) >= 2:
             csv_path = sys.argv[1]

@@ -1,0 +1,329 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>go â€“ Admin</title>
+  <style>
+    :root{
+      --bg:#0d1117; --panel:#161b22; --text:#c9d1d9; --muted:#8b949e;
+      --border:#30363d; --accent:#58a6ff; --danger:#f85149;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; background:var(--bg); color:var(--text);
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,'Helvetica Neue',Arial,'Noto Sans','Apple Color Emoji','Segoe UI Emoji','Segoe UI Symbol';
+      line-height:1.5; display:grid; place-items:start center; padding:2rem 1rem;
+      text-align:center;
+    }
+    a{color:var(--accent); text-decoration:none}
+    a:hover{text-decoration:underline}
+
+    .wrap{ width:min(980px,100%) }
+    h1{margin:0 0 1rem}
+    h2{margin:1.5rem 0 .75rem; color:var(--muted); font-weight:600}
+    .muted{color:var(--muted)}
+
+    code,kbd{
+      background:var(--panel); padding:.15rem .35rem; border-radius:6px;
+      border:1px solid var(--border); color:var(--text)
+    }
+
+    .row{display:grid; grid-template-columns:1fr 1fr; gap:1rem; align-items:start}
+    @media (max-width: 900px){ .row{grid-template-columns:1fr} }
+
+    /* Cards */
+    form.add-form, form.list-form{
+      background:var(--panel); border:1px solid var(--border); border-radius:12px;
+      padding:1rem; box-shadow:0 2px 12px rgba(0,0,0,.25);
+      text-align:center;
+    }
+    form.add-form{
+      background:var(--panel);
+      border:1px solid var(--border);
+      border-radius:12px;
+      padding:1rem;
+      box-shadow:0 2px 12px rgba(0,0,0,.25);
+      text-align:center;
+
+      /* NEW: make it long and full-width of the grid */
+      width:100%;
+      max-width:clamp(900px, 95vw, 1200px);
+      margin:0 auto;
+      grid-column:1 / -1; /* span both columns */
+    }
+
+    /* Keep Create list as a normal card */
+    form.list-form{
+      background:var(--panel);
+      border:1px solid var(--border);
+      border-radius:12px;
+      padding:1rem;
+      box-shadow:0 2px 12px rgba(0,0,0,.25);
+      text-align:center;
+      max-width:560px;
+      margin:0 auto;
+    }
+
+    .wrap{ width:min(1200px, 100%) }
+    /* Alternative: keep two columns, make left column wider */
+    .row{ display:grid; grid-template-columns:2.2fr 1fr; gap:1rem; align-items:start }
+    form.add-form{ grid-column:auto; max-width:100% }
+
+    label{display:block; margin-top:.75rem}
+    input,button{
+      font-size:1rem; padding:.6rem .8rem; border-radius:8px; border:1px solid var(--border)
+    }
+    input{
+      width:100%; max-width:100%;
+      background:#0b1320; color:var(--text); outline:none;
+      text-align:center;
+    }
+    input:focus{border-color:var(--accent); box-shadow:0 0 0 3px rgba(88,166,255,.25)}
+
+    button{
+      margin-top:.9rem; background:var(--accent); color:#0b0f14;
+      border-color:transparent; cursor:pointer; font-weight:600
+    }
+    button:hover{filter:brightness(1.08)}
+    .danger{background:var(--danger); color:#fff}
+
+    /* Filter bar */
+    .filter-card{
+      display:inline-block; background:var(--panel); border:1px solid var(--border);
+      border-radius:12px; padding:.6rem .8rem; margin-top:.5rem;
+      box-shadow:0 2px 12px rgba(0,0,0,.25)
+    }
+    .filter-input{
+      width:min(26rem,90vw); background:#0b1320; color:var(--text);
+      outline:none; border:1px solid var(--border); border-radius:8px;
+      padding:.55rem .75rem; text-align:center
+    }
+    .meta{margin-top:.4rem; color:var(--muted); font-size:.95rem}
+
+    /* Table */
+    table{
+      width:100%; border-collapse:collapse; margin:1rem auto 0;
+      background:var(--panel); border:1px solid var(--border);
+      border-radius:12px; overflow:hidden; text-align:center
+    }
+    th,td{
+      padding:.75rem .5rem; border-bottom:1px solid var(--border);
+      text-align:center; vertical-align:middle; /* center vertically to keep rows compact */
+    }
+    thead th{color:var(--muted); font-weight:600; background:rgba(255,255,255,.02)}
+    tbody tr:nth-child(even) td{background:rgba(255,255,255,.02)}
+
+    .actions form{display:inline-block; background:transparent; border:none; padding:0; box-shadow:none}
+
+    /* --- FIX: keep Update inline next to input, avoid row growth --- */
+    .lists-edit{display:flex; justify-content:center}
+    .lists-edit form{
+      display:flex; align-items:center; gap:.5rem; margin:0; flex-wrap:nowrap;
+    }
+    .lists-input{
+      width:auto;           /* override global input width */
+      min-width:12rem;
+      text-align:center;
+    }
+    .lists-edit button{
+      margin-top:0;         /* no vertical offset inside table row */
+    }
+    /* -------------------------------------------------------------- */
+
+    .footer{margin-top:1rem}
+    .hidden{display:none!important}
+    .chip{
+      display:inline-block; padding:.15rem .45rem; border:1px solid var(--border);
+      border-radius:999px; background:rgba(255,255,255,.04); margin:.1rem
+    }
+
+    /* Center the Delete button vertically in its cell */
+    td.actions { 
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
+    }
+
+    td.actions form { 
+      margin: 0; 
+    }
+
+    td.actions button { 
+      margin-top: 0;       /* override global button margin */
+    }
+
+    /* Page/container limits */
+    .wrap{ width:min(1400px, 100%) }                /* let page be wider than before */
+
+    /* Table wrapper that can grow but has a max width */
+    .table-wrap{
+      width: clamp(900px, 95vw, 1280px);            /* grows with content up to 1280px */
+      margin: 0 auto;
+      overflow-x: auto;                             /* horizontal scroll past the cap */
+      border-radius: 12px;
+    }
+
+    /* Table */
+    table{ width:100%; table-layout:auto }          /* auto columns, fill wrapper */
+
+    /* Dynamic column sizing */
+    .col-key, .col-actions{ width:1% }              /* shrink-to-fit */
+    .col-lists{ width:0.1% }
+
+    th:nth-child(1), td:nth-child(1),
+    th:nth-child(5), td:nth-child(5){ white-space:nowrap }
+
+    /* Keep URLs on one line */
+    td:nth-child(3) a{ white-space:normal; overflow-wrap:anywhere; }
+
+    /* Lists editor stays compact & inline */
+    .lists-input{ width: clamp(10rem, 22vw, 18rem); }
+    .lists-edit form{ display:flex; align-items:center; gap:.5rem; margin:0; flex-wrap:nowrap; }
+    .lists-edit button, .actions button{ margin-top:0; }
+    td.actions{ display:flex; align-items:center; justify-content:center; }
+
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Admin</h1>
+
+    <div class="row">
+      <!-- Add link -->
+      <form action="/admin/add" method="post" class="add-form">
+        <h2>Add link</h2>
+        <label>Keyword
+          <input name="keyword" required placeholder="gh">
+        </label>
+        <label>Title
+          <input name="title" placeholder="GitHub">
+        </label>
+        <label>URL
+          <input name="url" required placeholder="https://github.com">
+        </label>
+        <button type="submit">Save</button>
+      </form>
+
+      <!-- Create list -->
+      <form action="/admin/list-add" method="post" class="list-form">
+        <h2>Create list</h2>
+        <label>Name
+          <input name="name" placeholder="Work Projects">
+        </label>
+        <label>Description (optional)
+          <input name="description" placeholder="Links used for work">
+        </label>
+        <button type="submit">Add list</button>
+        <p class="meta">Browse: <a href="/lists">All lists</a></p>
+      </form>
+    </div>
+
+    <h2>Existing</h2>
+
+    <!-- Live filter bar -->
+    <div class="filter-card" role="search">
+      <input id="filter" class="filter-input" type="text" placeholder="Filter links (keyword, title, or URL)">
+      <div id="matchCount" class="meta"></div>
+    </div>
+
+    <table>
+      <colgroup>
+        <col class="col-key">
+        <col class="col-title">
+        <col class="col-url">
+        <col class="col-lists">
+        <col class="col-actions">
+      </colgroup>
+
+      <thead>
+        <tr><th>Keyword</th><th>Title</th><th>URL</th><th>Lists</th><th></th></tr>
+      </thead>
+      <tbody id="linksBody">
+        {% for row in rows %}
+          <tr
+            data-keyword="{{row['keyword']}}"
+            data-title="{{row['title'] or ''}}"
+            data-url="{{row['url']}}"
+          >
+            <td><code>{{row['keyword']}}</code></td>
+            <td>{{row['title'] or ''}}</td>
+            <td><a href="{{row['url']}}">{{row['url']}}</a></td>
+            <td>
+              <div class="lists-edit">
+                <form action="/admin/set-lists" method="post">
+                  <input type="hidden" name="keyword" value="{{row['keyword']}}">
+                  <input class="lists-input" name="slugs" list="lists_suggestions" placeholder="comma,separated" value="{{row['lists_csv']}}">
+                  <button type="submit">Update</button>
+                </form>
+              </div>
+              {% if row['lists_csv'] %}
+                <div class="meta">
+                  {% for s in row['lists_csv'].split(',') %}
+                    <span class="chip">{{ s.strip() }}</span>
+                  {% endfor %}
+                </div>
+              {% endif %}
+            </td>
+            <td class="actions">
+              <form action="/admin/delete" method="post">
+                <input type="hidden" name="keyword" value="{{row['keyword']}}">
+                <button class="danger" type="submit" onclick="return confirm('Delete {{row['keyword']}}?')">Delete</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+        <tr id="noRows" class="hidden">
+          <td colspan="5" class="muted">No matches.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="footer"><a href="/">Home</a> Â· <a href="/lists">Browse Lists</a></p>
+  </div>
+
+  <!-- list suggestions -->
+  <datalist id="lists_suggestions">
+    {% for li in all_lists %}
+      <option value="{{ li['slug'] }}">{{ li['name'] }}</option>
+    {% endfor %}
+  </datalist>
+
+  <script>
+    (function(){
+      const input = document.getElementById('filter');
+      const tbody = document.getElementById('linksBody');
+      if (!input || !tbody) return;
+
+      const rows = Array.from(tbody.querySelectorAll('tr')).filter(tr => tr.id !== 'noRows');
+      const noRows = document.getElementById('noRows');
+      const counter = document.getElementById('matchCount');
+
+      const norm = s => (s || '').toString().toLowerCase();
+
+      function applyFilter(){
+        const q = norm(input.value.trim());
+        let shown = 0;
+        for (const tr of rows){
+          const hay = (tr.dataset.keyword + ' ' + (tr.dataset.title || '') + ' ' + tr.dataset.url).toLowerCase();
+          const show = !q || hay.includes(q);
+          tr.classList.toggle('hidden', !show);
+          if (show) shown++;
+        }
+        if (noRows) noRows.classList.toggle('hidden', shown !== 0);
+        if (counter) counter.textContent = q ? `Showing ${shown} of ${rows.length}` : `${rows.length} total`;
+      }
+
+      let t; const DEBOUNCE_MS = 60;
+      input.addEventListener('input', () => { clearTimeout(t); t = setTimeout(applyFilter, DEBOUNCE_MS); });
+
+      const params = new URLSearchParams(location.search);
+      if (params.has('q')) input.value = params.get('q');
+
+      applyFilter();
+    })();
+  </script>
+</body>
+</html>
