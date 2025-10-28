@@ -2,6 +2,7 @@ Changelog
 
 ## 0.1.3
 
+- Fixed ruff config
 - Ruff formatting
 
 ## 0.1.2

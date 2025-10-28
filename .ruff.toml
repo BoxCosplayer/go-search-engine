@@ -1,5 +1,5 @@
 line-length = 115
-target-version = "py311"
+target-version = "py313"
 src = ["backend"]
 
 [lint]
