@@ -88,9 +88,7 @@ def load_config():
         return {}
 
 
-FALLBACK_URL_TEMPLATE = os.environ.get(
-    "GO_FALLBACK_URL_TEMPLATE", ""
-)  # e.g. "https://duckduckgo.com/?q={q}"
+FALLBACK_URL_TEMPLATE = os.environ.get("GO_FALLBACK_URL_TEMPLATE", "")  # e.g. "https://duckduckgo.com/?q={q}"
 
 if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
     _TEMPLATES_DIR = os.path.join(sys._MEIPASS, "backend", "app", "templates")  # type: ignore[attr-defined]
@@ -153,9 +151,7 @@ def go():
 
     prov = None
     if not exact:
-        prov = db.execute(
-            "SELECT url FROM links WHERE lower(keyword) = lower(?)", (key,)
-        ).fetchone()
+        prov = db.execute("SELECT url FROM links WHERE lower(keyword) = lower(?)", (key,)).fetchone()
 
     if exact and not prov:
         url = exact["url"]
@@ -236,11 +232,7 @@ def go():
 
 
 if __name__ == "__main__":
-    base_dir = (
-        os.path.dirname(sys.executable)
-        if getattr(sys, "frozen", False)
-        else os.path.dirname(__file__)
-    )
+    base_dir = os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else os.path.dirname(__file__)
     os.makedirs(os.path.join(base_dir, "data"), exist_ok=True)
     with sqlite3.connect(DB_PATH) as db:
         db.execute("""

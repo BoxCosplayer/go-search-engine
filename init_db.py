@@ -7,6 +7,7 @@ Usage:
 CSV format:
   keyword,title,url
 """
+
 import csv
 import os
 import sqlite3
@@ -17,12 +18,10 @@ try:
     from backend.app.db import DB_PATH, ensure_lists_schema  # type: ignore
 except Exception:
     # Fallback to repo-local data folder
-    DB_PATH = os.environ.get("GO_DB_PATH", os.path.join(os.path.dirname(__file__), 
-                                                        "backend", 
-                                                        "app", 
-                                                        "data", 
-                                                        "links.db"
-                                                        ))
+    DB_PATH = os.environ.get(
+        "GO_DB_PATH", os.path.join(os.path.dirname(__file__), "backend", "app", "data", "links.db")
+    )
+
     def ensure_lists_schema(conn):
         conn.execute("""
         CREATE TABLE IF NOT EXISTS lists (
@@ -43,6 +42,7 @@ except Exception:
         """)
         conn.commit()
 
+
 def ensure_schema(conn):
     conn.execute("""
     CREATE TABLE IF NOT EXISTS links (
@@ -53,6 +53,7 @@ def ensure_schema(conn):
     );
     """)
     conn.commit()
+
 
 def import_csv(conn, path):
     with open(path, newline="", encoding="utf-8") as f:
@@ -71,6 +72,7 @@ def import_csv(conn, path):
                 print(f"Skipping existing keyword: {kw}")
     conn.commit()
 
+
 def main():
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     with sqlite3.connect(DB_PATH) as conn:
@@ -86,6 +88,7 @@ def main():
             import_csv(conn, csv_path)
         else:
             print("Initialized DB at", DB_PATH)
+
 
 if __name__ == "__main__":
     main()

@@ -71,9 +71,7 @@ def admin_list_add():
     if not name:
         name = slug.replace("-", " ").title()
     try:
-        db.execute(
-            "INSERT INTO lists(slug, name, description) VALUES (?, ?, ?)", (slug, name, desc)
-        )
+        db.execute("INSERT INTO lists(slug, name, description) VALUES (?, ?, ?)", (slug, name, desc))
         db.commit()
     except Exception:
         abort(400, f"List '{slug}' already exists")
@@ -83,9 +81,7 @@ def admin_list_add():
     title = f"List - {name}"
 
     try:
-        db.execute(
-            "INSERT INTO links(keyword, url, title) VALUES (?, ?, ?)", (slug, list_url, title)
-        )
+        db.execute("INSERT INTO links(keyword, url, title) VALUES (?, ?, ?)", (slug, list_url, title))
         db.commit()
     except Exception:
         pass
@@ -118,9 +114,7 @@ def admin_set_lists():
     db.execute("DELETE FROM link_lists WHERE link_id=?", (link_id,))
     for slug in slugs:
         list_id = db.execute("SELECT id FROM lists WHERE slug=?", (slug,)).fetchone()["id"]
-        db.execute(
-            "INSERT OR IGNORE INTO link_lists(link_id, list_id) VALUES (?, ?)", (link_id, list_id)
-        )
+        db.execute("INSERT OR IGNORE INTO link_lists(link_id, list_id) VALUES (?, ?)", (link_id, list_id))
     db.commit()
     return redirect("/admin")
 

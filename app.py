@@ -16,4 +16,3 @@ except Exception:  # pragma: no cover
 
 if __name__ == "__main__":
     runpy.run_module("backend.app.main", run_name="__main__")
-

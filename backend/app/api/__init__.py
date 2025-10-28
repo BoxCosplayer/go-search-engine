@@ -21,17 +21,13 @@ def links():
         init_db()
         ensure_lists_schema(get_db())
         try:
-            db.execute(
-                "INSERT INTO links(keyword, url, title) VALUES (?, ?, ?)", (keyword, url, title)
-            )
+            db.execute("INSERT INTO links(keyword, url, title) VALUES (?, ?, ?)", (keyword, url, title))
             db.commit()
         except Exception:
             return {"error": f"keyword '{keyword}' already exists"}, 400
         return {"ok": True}
 
-    rows = db.execute(
-        "SELECT keyword, title, url FROM links ORDER BY keyword COLLATE NOCASE"
-    ).fetchall()
+    rows = db.execute("SELECT keyword, title, url FROM links ORDER BY keyword COLLATE NOCASE").fetchall()
     return {"links": [dict(r) for r in rows]}
 
 
@@ -51,9 +47,7 @@ def lists():
         if not name:
             name = slug.replace("-", " ").title()
         try:
-            db.execute(
-                "INSERT INTO lists(slug,name,description) VALUES (?,?,?)", (slug, name, desc)
-            )
+            db.execute("INSERT INTO lists(slug,name,description) VALUES (?,?,?)", (slug, name, desc))
             db.commit()
         except Exception:
             return {"error": "slug exists"}, 400
@@ -64,16 +58,12 @@ def lists():
         title = f"List - {name}"
 
         try:
-            db.execute(
-                "INSERT INTO links(keyword, url, title) VALUES (?, ?, ?)", (slug, list_url, title)
-            )
+            db.execute("INSERT INTO links(keyword, url, title) VALUES (?, ?, ?)", (slug, list_url, title))
             db.commit()
         except Exception:
             pass
 
         return {"ok": True}
 
-    rows = db.execute(
-        "SELECT slug,name,description FROM lists ORDER BY name COLLATE NOCASE"
-    ).fetchall()
+    rows = db.execute("SELECT slug,name,description FROM lists ORDER BY name COLLATE NOCASE").fetchall()
     return {"lists": [dict(r) for r in rows]}
