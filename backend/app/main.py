@@ -92,7 +92,12 @@ FALLBACK_URL_TEMPLATE = os.environ.get(
     "GO_FALLBACK_URL_TEMPLATE", ""
 )  # e.g. "https://duckduckgo.com/?q={q}"
 
-app = Flask(__name__)
+if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+    _TEMPLATES_DIR = os.path.join(sys._MEIPASS, "backend", "app", "templates")  # type: ignore[attr-defined]
+else:
+    _TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), "templates")
+
+app = Flask(__name__, template_folder=_TEMPLATES_DIR)
 db_init_app(app)
 app.register_blueprint(api_bp, url_prefix="/api")
 app.register_blueprint(admin_bp, url_prefix="/admin")
