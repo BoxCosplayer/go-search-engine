@@ -8,7 +8,7 @@ import threading
 import webbrowser
 from urllib.parse import quote_plus
 
-from flask import Flask, abort, redirect, render_template, request
+from flask import Flask, abort, redirect, render_template, request, url_for
 
 from .admin import admin_bp
 from .api import api_bp
@@ -117,6 +117,9 @@ def healthz():
 
 @app.route("/")
 def index():
+    query = (request.args.get("q") or "").trim() if hasattr(str, "trim") else (request.args.get("q") or "").strip()
+    if query:
+        return redirect(url_for("go", q=query), code=302)
     db = get_db()
     ensure_lists_schema(db)
     # If you have the lists schema, this will include list slugs per link.

@@ -1,116 +1,160 @@
-
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Not Found â€“ go</title>
   <style>
-    :root{
-      --bg:#0d1117;        /* GitHub dark background */
-      --panel:#161b22;     /* panel surface */
-      --text:#c9d1d9;      /* primary text */
-      --muted:#8b949e;     /* secondary text */
-      --border:#30363d;    /* subtle borders */
-      --accent:#58a6ff;    /* links / primary */
-    }
-    *{box-sizing:border-box}
-    html,body{height:100%}
-    body{
-      margin:0;
-      background:var(--bg);
-      color:var(--text);
-      font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,'Helvetica Neue',Arial,'Noto Sans','Apple Color Emoji','Segoe UI Emoji','Segoe UI Symbol';
-      line-height:1.5;
-      display:grid;
-      place-items:start center;   /* center horizontally; comfy top spacing */
-      padding:2rem 1rem;
-      text-align:center;          /* center text globally */
-    }
-    a{color:var(--accent);text-decoration:none}
-    a:hover{text-decoration:underline}
-
-    .wrap{
-      width:min(820px,100%);
+    :root {
+      --bg: #0d1117;
+      /* GitHub dark background */
+      --panel: #161b22;
+      /* panel surface */
+      --text: #c9d1d9;
+      /* primary text */
+      --muted: #8b949e;
+      /* secondary text */
+      --border: #30363d;
+      /* subtle borders */
+      --accent: #58a6ff;
+      /* links / primary */
     }
 
-    h1{margin:0 0 1rem}
-    .keyword{font-weight:700;color:var(--accent)}
-    .hint{color:var(--muted)}
+    * {
+      box-sizing: border-box
+    }
 
-    code,kbd{
-      background:var(--panel);
-      padding:0.15rem 0.35rem;border-radius:6px;
-      border:1px solid var(--border);
-      color:var(--text)
+    html,
+    body {
+      height: 100%
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
+      line-height: 1.5;
+      display: grid;
+      place-items: start center;
+      /* center horizontally; comfy top spacing */
+      padding: 2rem 1rem;
+      text-align: center;
+      /* center text globally */
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none
+    }
+
+    a:hover {
+      text-decoration: underline
+    }
+
+    .wrap {
+      width: min(820px, 100%);
+    }
+
+    h1 {
+      margin: 0 0 1rem
+    }
+
+    .keyword {
+      font-weight: 700;
+      color: var(--accent)
+    }
+
+    .hint {
+      color: var(--muted)
+    }
+
+    code,
+    kbd {
+      background: var(--panel);
+      padding: 0.15rem 0.35rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      color: var(--text)
     }
 
     /* Suggestions card */
-    .card{
-      background:var(--panel);
-      border:1px solid var(--border);
-      border-radius:12px;
-      padding:1rem;
-      box-shadow:0 2px 12px rgba(0,0,0,.25);
-      margin:0.75rem auto 0;
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, .25);
+      margin: 0.75rem auto 0;
     }
 
-    ul{
-      list-style:none;
-      padding:0;
-      margin:0.25rem 0 0;
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 0.25rem 0 0;
     }
-    li{
-      margin:0.35rem 0;
-      padding:0.6rem 0.75rem;
-      border:1px solid var(--border);
-      border-radius:10px;
-      background:rgba(255,255,255,.02);
+
+    li {
+      margin: 0.35rem 0;
+      padding: 0.6rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, .02);
     }
-    li small{display:block;margin-top:0.25rem;color:var(--muted)}
-    hr{
-      border:0;
-      height:1px;
-      background:var(--border);
-      margin:1.25rem auto;
-      width:min(720px,100%);
+
+    li small {
+      display: block;
+      margin-top: 0.25rem;
+      color: var(--muted)
+    }
+
+    hr {
+      border: 0;
+      height: 1px;
+      background: var(--border);
+      margin: 1.25rem auto;
+      width: min(720px, 100%);
     }
   </style>
 </head>
+
 <body>
   <div class="wrap">
     <h1>No exact match for <span class="keyword">{{q}}</span></h1>
 
     {% if suggestions %}
-      <div class="card">
-        <p>Did you mean:</p>
-        <ul>
-          {% for s in suggestions %}
-            <li>
-              <a href="{{s['url']}}">{{s['keyword']}}</a>
-              {% if s['title'] %} â€“ {{s['title']}}{% endif %}
-              <small>{{s['url']}}</small>
-            </li>
-          {% endfor %}
-        </ul>
-      </div>
+    <div class="card">
+      <p>Did you mean:</p>
+      <ul>
+        {% for s in suggestions %}
+        <li>
+          <a href="{{s['url']}}">{{s['keyword']}}</a>
+          {% if s['title'] %} â€“ {{s['title']}}{% endif %}
+          <small>{{s['url']}}</small>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
     {% else %}
-      <div class="card">
-        <p>No suggestions in the database.</p>
-      </div>
+    <div class="card">
+      <p>No suggestions in the database.</p>
+    </div>
     {% endif %}
 
     {% if fallback_url %}
-      <p class="hint">Nothing matched locally. Redirecting you to a web search would have been:<br>
-      <a href="{{fallback_url}}">{{fallback_url}}</a></p>
+    <p class="hint">Nothing matched locally. Redirecting you to a web search would have been:<br>
+      <a href="{{fallback_url}}">{{fallback_url}}</a>
+    </p>
     {% endif %}
 
     <hr>
     <p class="nav">
-      <a href="/">â† Back to Home</a>
+      <a href="/">Back to Home</a>
       {% if home_prefill %} <a href="{{home_prefill}}">Home (pre-filled with â€œ{{q}}â€)</a> {% endif %}
     </p>
     <p class="hint">Tip: add a new shortcut via <code>POST /api/links</code> or the <a href="/admin">Admin UI</a>.</p>
   </div>
 </body>
+
 </html>

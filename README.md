@@ -1,36 +1,6 @@
-## TODOS
+# go – local shortcuts server
 
-# app protocols to open apps
-## go [name]
-
-# Multi search - DONE need to add links
-## go wiki ""
-## go define ""
-## go weather "cheltenham"
-## go maps "cheltenham" -> directions
-
-# extra go links:
-## dailys [list]
-## go files or folders
-## milks
-## cvs
-## wheel
-### overleaf
-### pdf
-## applications [list] [web]
-## easter eggs
-### go gamble
-### go roll "x" / go flip
-
-# dns
-# export / import (db)
-# dockeur on ds
-# browser extension
-# load html from other files very simply
-
-# go – local shortcuts server (Flask)
-
-This local Flask app lets you type `go <keyword>` in your browser's address bar and jump straight to a stored URL. It now uses clean packages, Blueprints, and Jinja templates, with a consistent database location and optional system tray.
+This local Flask app lets you type `go <keyword>` in your browser's address bar and jump straight to a stored URL. It uses clean packages, Blueprints, and Jinja templates, with a consistent database location and optional system tray.
 
 ## How it works
 
@@ -75,8 +45,12 @@ python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
-# (Optional) initialize and import sample shortcuts
-python init_db.py links.csv
+# configure ip address and port in config.py
+
+{
+    "host": "ipaddress" # Default: 127.0.0.100
+    "port": portnum, # Default: 34000
+}
 
 # run the server (compat shim)
 python app.py
@@ -90,17 +64,19 @@ gunicorn backend.wsgi:application
 
 By default it listens on `127.0.0.1:5000` and stores data in `backend/app/data/links.db`.
 
-## Add to Firefox (no extension needed)
+## Add to Browser (no extension needed)
 
-**Option A – Bookmark keyword (recommended, works everywhere):**
+**Option A – Custom search engine entry (recommended):**
 
-1. Create a new bookmark with URL: `http://127.0.0.1:5000/go?q=%s`
-2. Set the bookmark's **Keyword** to `go`.
-3. In the address bar, type: `go gh` → jumps to GitHub, etc.
+1. Add a search engine
+2. add keyword "go"
+3. add url http://[IPAddress]:5000/?q=%s (default: http://127.0.0.1:5000/?q=%s)
+4. Type in "go [keyword]" to access the homepage
 
-**Option B – Custom search engine entry:**
+**Option B – Bookmark Home page:**
 
-Some Firefox builds let you add a custom engine under Settings → Search, using the same URL template `http://127.0.0.1:5000/go?q=%s` and giving it a keyword `go`. If your build doesn't expose that UI, Option A works universally.
+1. Create a new bookmark with URL: `http://127.0.0.1:5000/`
+2. Access all features via the GUI
 
 ## Managing shortcuts
 

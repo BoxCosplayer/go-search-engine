@@ -1,62 +1,183 @@
-
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>go â€“ local shortcuts</title>
+  <title>go · local shortcuts</title>
   <style>
-    :root{ --bg:#0d1117; --panel:#161b22; --text:#c9d1d9; --muted:#8b949e; --border:#30363d; --accent:#58a6ff; }
-    *{box-sizing:border-box}
-    html,body{height:100%}
-    body{
-      margin:0; background:var(--bg); color:var(--text);
-      font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,'Helvetica Neue',Arial,'Noto Sans','Apple Color Emoji','Segoe UI Emoji','Segoe UI Symbol';
-      line-height:1.5; display:grid; place-items:center; text-align:center; padding:2rem 1rem;
+    :root {
+      --bg: #0d1117;
+      --panel: #161b22;
+      --text: #c9d1d9;
+      --muted: #8b949e;
+      --border: #30363d;
+      --accent: #58a6ff;
     }
-    a{color:var(--accent); text-decoration:none}
-    a:hover{text-decoration:underline}
-    .wrap{ width:min(900px,100%) }
-    h1{ margin:0 0 .75rem } h2{ margin:1.5rem 0 .75rem; color:var(--muted); font-weight:600 }
-    p{ margin:.25rem 0 1rem }
-    code,kbd{
-      background:var(--panel); padding:.15rem .35rem; border-radius:6px;
-      border:1px solid var(--border); color:var(--text)
-    }
-    form{
-      display:inline-block; background:var(--panel); border:1px solid var(--border);
-      border-radius:12px; padding:.75rem; box-shadow:0 2px 12px rgba(0,0,0,.25);
-    }
-    input,button{ font-size:1rem; padding:.6rem .8rem; border-radius:8px; border:1px solid var(--border) }
-    input[type="text"]{ width:min(26rem, 90vw); background:#0b1320; color:var(--text); outline:none; margin-right:.5rem }
-    input[type="text"]:focus{ border-color:var(--accent); box-shadow:0 0 0 3px rgba(88,166,255,.25) }
-    button{ background:var(--accent); color:#0b0f14; border-color:transparent; cursor:pointer; font-weight:600 }
-    button:hover{ filter:brightness(1.08) }
-    .meta{ margin-top:.5rem; color:var(--muted); font-size:.95rem }
 
-    table{
-      width:100%; border-collapse:collapse; margin:.75rem auto 0;
-      background:var(--panel); border:1px solid var(--border);
-      border-radius:12px; overflow:hidden;
+    * {
+      box-sizing: border-box
     }
-    th,td{ padding:.75rem .5rem; border-bottom:1px solid var(--border); text-align:center }
-    thead th{ color:var(--muted); font-weight:600; background:rgba(255,255,255,.02) }
-    tbody tr:nth-child(even) td{ background:rgba(255,255,255,.02) }
 
-    .chip{
-      display:inline-block; padding:.15rem .45rem; margin:.1rem;
-      border:1px solid var(--border); border-radius:999px;
-      background:rgba(255,255,255,.04); color:var(--text); font-size:.9rem;
+    html,
+    body {
+      height: 100%
     }
-    .muted{ color:var(--muted) }
-    .footer{ margin-top:.75rem; color:var(--muted) }
-    .hidden{ display:none !important }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
+      line-height: 1.5;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      padding: 2rem 1rem;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none
+    }
+
+    a:hover {
+      text-decoration: underline
+    }
+
+    .wrap {
+      width: min(900px, 100%)
+    }
+
+    h1 {
+      margin: 0 0 .75rem
+    }
+
+    h2 {
+      margin: 1.5rem 0 .75rem;
+      color: var(--muted);
+      font-weight: 600
+    }
+
+    p {
+      margin: .25rem 0 1rem
+    }
+
+    code,
+    kbd {
+      background: var(--panel);
+      padding: .15rem .35rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      color: var(--text)
+    }
+
+    form {
+      display: inline-block;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: .75rem;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, .25);
+    }
+
+    input,
+    button {
+      font-size: 1rem;
+      padding: .6rem .8rem;
+      border-radius: 8px;
+      border: 1px solid var(--border)
+    }
+
+    input[type="text"] {
+      width: min(26rem, 90vw);
+      background: #0b1320;
+      color: var(--text);
+      outline: none;
+      margin-right: .5rem
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(88, 166, 255, .25)
+    }
+
+    button {
+      background: var(--accent);
+      color: #0b0f14;
+      border-color: transparent;
+      cursor: pointer;
+      font-weight: 600
+    }
+
+    button:hover {
+      filter: brightness(1.08)
+    }
+
+    .meta {
+      margin-top: .5rem;
+      color: var(--muted);
+      font-size: .95rem
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: .75rem auto 0;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    th,
+    td {
+      padding: .75rem .5rem;
+      border-bottom: 1px solid var(--border);
+      text-align: center
+    }
+
+    thead th {
+      color: var(--muted);
+      font-weight: 600;
+      background: rgba(255, 255, 255, .02)
+    }
+
+    tbody tr:nth-child(even) td {
+      background: rgba(255, 255, 255, .02)
+    }
+
+    .chip {
+      display: inline-block;
+      padding: .15rem .45rem;
+      margin: .1rem;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, .04);
+      color: var(--text);
+      font-size: .9rem;
+    }
+
+    .muted {
+      color: var(--muted)
+    }
+
+    .footer {
+      margin-top: .75rem;
+      color: var(--muted)
+    }
+
+    .hidden {
+      display: none !important
+    }
   </style>
 </head>
+
 <body>
   <div class="wrap">
     <h1>go</h1>
-    <p>Type <kbd>go&nbsp;&lt;keyword&gt;</kbd> in your browser's address bar (via a bookmark keyword or custom search engine) to jump to a URL.</p>
+    <p>Type <kbd>go&nbsp;&lt;keyword&gt;</kbd> in your browser's address bar (via a bookmark keyword or custom search
+      engine) to jump to a URL.</p>
 
     <form action="/go" method="get" role="search" autocomplete="off">
       <input type="text" name="q" id="q" placeholder="keyword (e.g., gh)" autofocus>
@@ -68,30 +189,31 @@
     <h2>Links</h2>
     <table>
       <thead>
-        <tr><th>Keyword</th><th>Title</th><th>URL</th><th>Lists</th></tr>
+        <tr>
+          <th>Keyword</th>
+          <th>Title</th>
+          <th>URL</th>
+          <th>Lists</th>
+        </tr>
       </thead>
       <tbody id="linksBody">
         {% for row in rows %}
-          <tr
-            data-keyword="{{ row['keyword'] }}"
-            data-title="{{ (row['title'] or '') }}"
-            data-url="{{ row['url'] }}"
-            data-lists="{{ (row['lists_csv'] or '') }}"
-          >
-            <td class="kw"><code>{{row['keyword']}}</code></td>
-            <td class="ti">{{row['title'] or ''}}</td>
-            <td class="ur"><a href="{{row['url']}}">{{row['url']}}</a></td>
-            <td class="li">
-              {% if row['lists_csv'] %}
-                {% for s in row['lists_csv'].split(',') %}
-                  {% set slug = s.strip() %}
-                  <a class="chip" href="/lists/{{ slug }}">{{ slug }}</a>
-                {% endfor %}
-              {% else %}
-                <span class="muted">â€”</span>
-              {% endif %}
-            </td>
-          </tr>
+        <tr data-keyword="{{ row['keyword'] }}" data-title="{{ (row['title'] or '') }}" data-url="{{ row['url'] }}"
+          data-lists="{{ (row['lists_csv'] or '') }}">
+          <td class="kw"><code>{{row['keyword']}}</code></td>
+          <td class="ti">{{row['title'] or ''}}</td>
+          <td class="ur"><a href="{{row['url']}}">{{row['url']}}</a></td>
+          <td class="li">
+            {% if row['lists_csv'] %}
+            {% for s in row['lists_csv'].split(',') %}
+            {% set slug = s.strip() %}
+            <a class="chip" href="/lists/{{ slug }}">{{ slug }}</a>
+            {% endfor %}
+            {% else %}
+            <span class="muted">|</span>
+            {% endif %}
+          </td>
+        </tr>
         {% endfor %}
         <tr id="noRows" class="hidden">
           <td colspan="4" class="muted">No matches.</td>
@@ -99,18 +221,18 @@
       </tbody>
     </table>
 
-    <p class="footer"><a href="/lists">Lists</a> Â· <a href="/admin">Admin UI</a> Â· <a href="/healthz">health</a></p>
+    <p class="footer"><a href="/lists">Lists</a> · <a href="/admin">Admin UI</a> · <a href="/healthz">health</a></p>
   </div>
 
   <script>
-    (function(){
+    (function () {
       const input = document.getElementById('q');
       const tbody = document.getElementById('linksBody');
-      const rows  = Array.from(tbody.querySelectorAll('tr')).filter(tr => tr.id !== 'noRows');
+      const rows = Array.from(tbody.querySelectorAll('tr')).filter(tr => tr.id !== 'noRows');
       const noRows = document.getElementById('noRows');
       const counter = document.getElementById('matchCount');
 
-      function norm(s){ return (s || '').toString().toLowerCase(); }
+      function norm(s) { return (s || '').toString().toLowerCase(); }
 
       function applyFilter() {
         const q = norm(input.value.trim());
@@ -118,8 +240,8 @@
         for (const tr of rows) {
           const hay = (
             (tr.dataset.keyword || '') + ' ' +
-            (tr.dataset.title || '')   + ' ' +
-            (tr.dataset.url || '')     + ' ' +
+            (tr.dataset.title || '') + ' ' +
+            (tr.dataset.url || '') + ' ' +
             (tr.dataset.lists || '')
           ).toLowerCase();
           const show = !q || hay.includes(q);
@@ -146,4 +268,5 @@
     })();
   </script>
 </body>
+
 </html>
