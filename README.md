@@ -49,7 +49,6 @@ pip install -r requirements.txt
 
 {
     "host": "ipaddress" # Default: 127.0.0.100
-    "port": portnum, # Default: 34000
 }
 
 # run the server (compat shim)
