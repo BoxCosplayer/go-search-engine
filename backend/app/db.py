@@ -6,6 +6,12 @@ from flask import g
 
 
 def _base_dir() -> str:
+    """Return the base directory for app data.
+
+    Uses the directory of the executable when running as a PyInstaller bundle,
+    otherwise the directory of this module. This keeps the database and other
+    runtime files colocated with the app.
+    """
     if getattr(sys, "frozen", False):
         return os.path.dirname(sys.executable)
     return os.path.dirname(__file__)
@@ -17,6 +23,16 @@ DB_PATH = os.environ.get("GO_DB_PATH", os.path.join(BASE_DIR, "data", "links.db"
 
 
 def get_db():
+    """Get a request-scoped SQLite connection.
+
+    - Creates the `data/` directory under BASE_DIR if needed.
+    - Enables `PRAGMA foreign_keys = ON`.
+    - Stores the connection in Flask's `g` so each request reuses a single
+      connection.
+
+    Returns:
+        sqlite3.Connection: The open database connection.
+    """
     if "db" not in g:
         os.makedirs(os.path.join(BASE_DIR, "data"), exist_ok=True)
         g.db = sqlite3.connect(DB_PATH)
@@ -26,12 +42,17 @@ def get_db():
 
 
 def close_db(exc):
+    """Teardown handler: close the request-scoped DB connection if present."""
     db = g.pop("db", None)
     if db is not None:
         db.close()
 
 
 def init_db():
+    """Ensure the core `links` table exists.
+
+    Creates the `links` table if missing and commits the change.
+    """
     db = get_db()
     db.execute(
         """
@@ -47,6 +68,11 @@ def init_db():
 
 
 def ensure_lists_schema(db):
+    """Ensure list-related tables exist (`lists`, `link_lists`).
+
+    Args:
+        db: An open sqlite3.Connection to run DDL statements against.
+    """
     db.execute(
         """
         CREATE TABLE IF NOT EXISTS lists (
@@ -72,6 +98,11 @@ def ensure_lists_schema(db):
 
 
 def init_app(app):
+    """Register DB teardown and run one-time migration.
+
+    Args:
+        app: The Flask application instance.
+    """
     migrate_old_db_if_present()
     app.teardown_appcontext(close_db)
 

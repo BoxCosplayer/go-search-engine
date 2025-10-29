@@ -8,6 +8,20 @@ api_bp = Blueprint("api", __name__)
 
 @api_bp.route("/links", methods=["GET", "POST"])
 def links():
+    """Links endpoint.
+
+    GET:
+        Returns a JSON object with all links:
+            { "links": [{"keyword","title","url"}, ...] }
+
+    POST (application/json):
+        Body fields:
+          - keyword (str, required)
+          - url (str, required; must start with http:// or https://)
+          - title (str, optional)
+        Creates a new link, returning {"ok": true} on success or an error JSON
+        with HTTP 400 when validation or uniqueness fails.
+    """
     db = get_db()
     if request.method == "POST":
         data = request.get_json(silent=True) or {}
@@ -33,6 +47,23 @@ def links():
 
 @api_bp.route("/lists", methods=["GET", "POST"])
 def lists():
+    """Lists endpoint.
+
+    GET:
+        Returns all lists as JSON:
+            { "lists": [{"slug","name","description"}, ...] }
+
+    POST (application/json):
+        Body fields:
+          - slug (str, optional)
+          - name (str, optional)
+          - description (str, optional)
+        At least one of slug or name is required. Missing slug is generated
+        from name. Missing name is derived from slug. Also creates a shortcut
+        link (keyword == slug) pointing to /lists/<slug>. Returns {"ok": true}
+        on success or an error JSON with HTTP 400 when validation/uniqueness
+        fails.
+    """
     db = get_db()
     ensure_lists_schema(db)
     if request.method == "POST":

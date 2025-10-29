@@ -44,6 +44,14 @@ except Exception:
 
 
 def ensure_schema(conn):
+    """Create the core `links` table if it does not exist.
+
+    Args:
+        conn (sqlite3.Connection): Open connection to the database file.
+
+    Side effects:
+        Executes DDL and commits the transaction.
+    """
     conn.execute("""
     CREATE TABLE IF NOT EXISTS links (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -56,6 +64,15 @@ def ensure_schema(conn):
 
 
 def import_csv(conn, path):
+    """Import links from a CSV file into the `links` table.
+
+    The CSV is expected to have a header row with columns:
+    `keyword,title,url`.
+
+    Args:
+        conn (sqlite3.Connection): Database connection to write into.
+        path (str): Path to the CSV file on disk.
+    """
     with open(path, newline="", encoding="utf-8") as f:
         rdr = csv.DictReader(f)
         for row in rdr:
@@ -74,6 +91,14 @@ def import_csv(conn, path):
 
 
 def main():
+    """Initialize the database file and optionally import a CSV.
+
+    Behavior:
+      - Ensures the database directory exists.
+      - Creates core schema (`links`) and list-related schema.
+      - If a CSV path is provided as the first CLI argument, imports rows.
+      - Otherwise, prints the initialized DB path.
+    """
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     with sqlite3.connect(DB_PATH) as conn:
         ensure_schema(conn)

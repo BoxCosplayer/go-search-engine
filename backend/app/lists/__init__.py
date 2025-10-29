@@ -7,6 +7,14 @@ lists_bp = Blueprint("lists", __name__)
 
 @lists_bp.route("/")
 def index():
+    """Render the Lists index page.
+
+    Shows all lists with their name, optional description, and the number of
+    links in each list.
+
+    Returns:
+        A rendered HTML page (lists/index.html) with a "lists" collection.
+    """
     db = get_db()
     ensure_lists_schema(db)
     rows = db.execute(
@@ -23,6 +31,19 @@ def index():
 
 @lists_bp.route("/<slug>")
 def view(slug):
+    """Render a single list page.
+
+    Args:
+        slug: The list slug to display.
+
+    Behavior:
+        - Looks up the list by slug (case-insensitive).
+        - Shows all links associated with that list.
+        - Returns 404 if the list does not exist.
+
+    Returns:
+        A rendered HTML page (lists/view.html) with "list" metadata and its "rows".
+    """
     db = get_db()
     ensure_lists_schema(db)
     info = db.execute(

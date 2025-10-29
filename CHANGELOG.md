@@ -1,4 +1,9 @@
-Changelog
+# Changelog
+
+## 0.1.4
+
+- Fixed slugify / python-slugify conflicts for lists
+- Added docstrings for all functions 
 
 ## 0.1.3
 

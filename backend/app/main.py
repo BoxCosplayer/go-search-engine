@@ -36,6 +36,15 @@ except Exception:
 
 
 def _make_tray_image():
+    """Create an in-memory tray icon image.
+
+    Builds a simple 64x64 RGBA badge with a rounded rectangle and a
+    "go" label in the project accent color. Used when the optional
+    system tray is enabled via pystray.
+
+    Returns:
+        PIL.Image.Image: The generated icon image.
+    """
     # 64x64 simple dark badge with "go"
     W = H = 64
     bg = (13, 17, 23, 255)  # #0d1117
@@ -55,6 +64,11 @@ def _make_tray_image():
 
 
 def _base_dir() -> str:  # if running as a PyInstaller EXE, use the folder containing the executable
+    """Return the base folder for runtime resources.
+
+    Uses the executable directory when frozen (PyInstaller), otherwise
+    the directory of this module. Keeps data files colocated with the app.
+    """
     if getattr(sys, "frozen", False):
         return os.path.dirname(sys.executable)
     return os.path.dirname(__file__)
@@ -64,6 +78,16 @@ BASE_DIR = _base_dir()
 
 
 def _resource_path(name: str) -> str:
+    """Resolve a resource path for dev and frozen builds.
+
+    Search order:
+      1) Next to the running script/executable (BASE_DIR/name)
+      2) Inside the PyInstaller bundle (sys._MEIPASS/name)
+      3) Fallback to BASE_DIR/name
+
+    Args:
+        name: Relative file or directory name.
+    """
     # 1) external next to exe/script, 2) bundled in one-file exe, 3) fallback
     p1 = os.path.join(BASE_DIR, name)
     if os.path.exists(p1):
@@ -79,6 +103,14 @@ def _resource_path(name: str) -> str:
 
 
 def load_config():
+    """Load optional JSON configuration.
+
+    Honors GO_CONFIG_PATH when set, otherwise looks for config.json
+    alongside the script/executable via _resource_path.
+
+    Returns:
+        dict: Parsed config values or an empty dict on error/missing file.
+    """
     # Optional JSON file with defaults
     cfg_path = os.environ.get("GO_CONFIG_PATH") or _resource_path("config.json")
     try:
@@ -104,6 +136,11 @@ app.register_blueprint(lists_bp, url_prefix="/lists")
 
 @app.route("/healthz")
 def healthz():
+    """Lightweight health check endpoint.
+
+    Returns JSON {"status": "ok"} when a simple `SELECT 1` succeeds, or
+    an error payload with HTTP 500 when it fails.
+    """
     # Basic health endpoint
     try:
         db = get_db()
@@ -115,6 +152,11 @@ def healthz():
 
 @app.route("/")
 def index():
+    """Render the home page or redirect a search query.
+
+    - If `q` is present (e.g., `/?q=gh`), redirect to `/go?q=...`.
+    - Otherwise, render the index view listing known links.
+    """
     query = (request.args.get("q") or "").trim() if hasattr(str, "trim") else (request.args.get("q") or "").strip()
     if query:
         return redirect(url_for("go", q=query), code=302)
@@ -135,10 +177,13 @@ def index():
 
 @app.route("/go")
 def go():
-    """
-    Main redirector endpoint. Accepts ?q=<keyword> and sends a 302 to the stored URL.
-    - Exact match on keyword (case-insensitive)
-    - If no exact match, shows a suggestions page and (optionally) a fallback search URL
+    """Main redirector endpoint.
+
+    Accepts `?q=<keyword>` and resolves it to a URL:
+      - Exact match: 302 to the stored URL (supports http/https, file:// with safeguards)
+      - Prefix/template provider: expands placeholders and redirects
+      - No match: renders the suggestions page (not_found.html), optionally
+        showing a fallback search link when configured.
     """
     raw = (request.args.get("q") or "").strip()
     q = sanitize_query(raw)
@@ -250,6 +295,7 @@ if __name__ == "__main__":
     debug = os.environ.get("FLASK_DEBUG", "0") == "1"
 
     def _run_server():
+        """Run the Flask development server (no reloader)."""
         app.run(host=host, port=port, debug=debug, use_reloader=False)
 
     t = threading.Thread(target=_run_server, daemon=True)

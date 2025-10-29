@@ -130,7 +130,7 @@
         {% for s in suggestions %}
         <li>
           <a href="{{s['url']}}">{{s['keyword']}}</a>
-          {% if s['title'] %} â€“ {{s['title']}}{% endif %}
+          {% if s['title'] %} {{s['title']}}{% endif %}
           <small>{{s['url']}}</small>
         </li>
         {% endfor %}

@@ -1,4 +1,5 @@
-"""App package: exposes the Flask `app` instance.
+"""
+App package: exposes the Flask `app` instance.
 
 Importing `backend.app` gives you the `app` object from
 `backend.app.main` so WSGI servers and tools can reference

@@ -17,6 +17,14 @@ _TRAILING_PUNCT_RE = re.compile(r"[\s'\"`#@)\]\},.!?:;]+$")
 
 
 def split_query(raw: str):
+    """Split a raw query string into (keyword, remainder, words).
+
+    Args:
+        raw: The full input string (e.g., "gh issues open").
+
+    Returns:
+        tuple[str, str, list[str]]: (keyword, remainder, words)
+    """
     parts = (raw or "").strip().split()
     if not parts:
         return "", "", []
@@ -24,6 +32,10 @@ def split_query(raw: str):
 
 
 def render_url_template(url_tmpl: str, full_q: str, args: str, words: list[str]) -> str:
+    """Render a URL template by substituting supported placeholders.
+
+    Supported placeholders: {q}, {args}, {args_raw}, {args_url}, and {1},{2},...
+    """
     out = (
         url_tmpl.replace("{q}", quote_plus(full_q))
         .replace("{args}", quote_plus(args))
@@ -39,6 +51,7 @@ def render_url_template(url_tmpl: str, full_q: str, args: str, words: list[str])
 
 
 def sanitize_query(raw: str) -> str:
+    """Normalize an incoming query string: trim, unquote, strip trailing punct."""
     if not raw:
         return ""
     q = raw.strip()
@@ -48,14 +61,32 @@ def sanitize_query(raw: str) -> str:
 
 
 def to_slug(s: str) -> str:
+    """Return a URL-friendly slug.
+
+    Prefers python-slugify if available. If an older 'slugify' package is
+    installed (different API), gracefully falls back and normalizes output.
+    """
+    txt = (s or "").strip()
     if slugify is not None:
-        return slugify(s or "", lowercase=True, separator="-")
-    s = (s or "").strip().lower()
-    s = re.sub(r"\s+", "-", s)
-    return re.sub(r"[^a-z0-9\-_]", "", s)
+        try:
+            # python-slugify API
+            return slugify(txt, separator="-", lowercase=True)  # type: ignore[arg-type]
+        except TypeError:
+            # Older 'slugify' package without these kwargs
+            try:
+                res = slugify(txt)  # type: ignore[call-arg]
+            except Exception:
+                res = txt
+            res = res.replace(" ", "-").lower()
+            return re.sub(r"[^a-z0-9\-_]", "", res)
+    # Pure-Python fallback
+    txt = txt.lower()
+    txt = re.sub(r"\s+", "-", txt)
+    return re.sub(r"[^a-z0-9\-_]", "", txt)
 
 
 def file_url_to_path(url: str) -> str:
+    """Convert a file:// URL to a local OS path (handles UNC on Windows)."""
     u = urlparse(url)
     if u.scheme != "file":
         raise ValueError("not a file URL")
@@ -67,6 +98,7 @@ def file_url_to_path(url: str) -> str:
 
 
 def is_allowed_path(path: str) -> bool:
+    """Return True if path is within any GO_FILE_ALLOW root (or allowed by default)."""
     allow_env = os.environ.get("GO_FILE_ALLOW", "").strip()
     if not allow_env:
         return True
@@ -83,6 +115,7 @@ def is_allowed_path(path: str) -> bool:
 
 
 def open_path_with_os(path: str) -> None:
+    """Open a file/folder with the OS default handler (startfile/open/xdg-open)."""
     if sys.platform.startswith("win"):
         os.startfile(path)  # type: ignore[attr-defined]
     elif sys.platform == "darwin":
@@ -92,6 +125,7 @@ def open_path_with_os(path: str) -> None:
 
 
 def load_config():
+    """Load JSON config from GO_CONFIG_PATH or repo config.json (best-effort)."""
     cfg_path = os.environ.get("GO_CONFIG_PATH") or os.path.join(
         os.path.dirname(__file__), "..", "..", "config.json"
     )

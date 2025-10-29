@@ -8,6 +8,14 @@ admin_bp = Blueprint("admin", __name__)
 
 @admin_bp.route("/")
 def admin_home():
+    """Render the Admin home page.
+
+    Lists all links with their associated list slugs and provides data for the
+    lists datalist suggestions.
+
+    Returns:
+        A rendered HTML page (admin/index.html).
+    """
     db = get_db()
     ensure_lists_schema(db)
     rows = db.execute(
@@ -28,6 +36,16 @@ def admin_home():
 
 @admin_bp.route("/add", methods=["POST"])
 def admin_add():
+    """Create a new link from form data.
+
+    Expects form fields:
+        - keyword (required)
+        - url (required)
+        - title (optional)
+
+    On success, commits to the database and redirects back to /admin.
+    Aborts with 400 if validation fails or the keyword already exists.
+    """
     keyword = (request.form.get("keyword") or "").strip()
     title = (request.form.get("title") or "").strip() or None
     url = (request.form.get("url") or "").strip()
@@ -48,6 +66,14 @@ def admin_add():
 
 @admin_bp.route("/delete", methods=["POST"])
 def admin_delete():
+    """Delete an existing link by keyword.
+
+    Expects form field:
+        - keyword (required)
+
+    On success, removes the link and redirects to /admin.
+    Aborts with 400 if keyword is missing.
+    """
     keyword = (request.form.get("keyword") or "").strip()
     if not keyword:
         abort(400, "Keyword required")
@@ -59,6 +85,19 @@ def admin_delete():
 
 @admin_bp.route("/list-add", methods=["POST"])
 def admin_list_add():
+    """Create a new list and a corresponding shortcut link.
+
+    Expects form fields:
+        - name (optional if slug provided)
+        - slug (optional; generated from name if missing)
+        - description (optional)
+
+    Behavior:
+        - Creates the list record (slug, name, description).
+        - Adds a link with the same slug pointing to /lists/<slug>.
+        - Redirects back to /admin.
+    Aborts with 400 if both name and slug are missing or slug already exists.
+    """
     db = get_db()
     ensure_lists_schema(db)
     name = (request.form.get("name") or "").strip()
@@ -91,6 +130,18 @@ def admin_list_add():
 
 @admin_bp.route("/set-lists", methods=["POST"])
 def admin_set_lists():
+    """Update a link's associated lists (CSV of slugs).
+
+    Expects form fields:
+        - keyword (required)
+        - slugs (CSV string, optional)
+
+    Behavior:
+        - Auto-creates any missing lists using pretty names.
+        - Replaces existing associations for the link with the provided set.
+        - Redirects back to /admin.
+    Aborts with 404 if the link is not found.
+    """
     db = get_db()
     ensure_lists_schema(db)
     keyword = (request.form.get("keyword") or "").strip()
@@ -121,6 +172,16 @@ def admin_set_lists():
 
 @admin_bp.route("/list-delete", methods=["POST"])
 def admin_list_delete():
+    """Delete a list by slug and redirect to the lists index.
+
+    Expects form field:
+        - slug (required)
+
+    Behavior:
+        - Removes the list row (cascades through link_lists).
+        - Redirects to /lists after deletion.
+    Aborts with 400 if slug is missing, or 404 if the list doesn't exist.
+    """
     db = get_db()
     slug = (request.form.get("slug") or "").strip()
     if not slug:
