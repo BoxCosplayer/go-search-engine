@@ -6,6 +6,7 @@
 
 - Added admin UI to change and update the config
 - Added "Major Verions Log" to the changelog
+- Removed Config from repo, added template for documentation purposes
 
 ## 0.2.1
 
