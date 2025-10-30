@@ -50,8 +50,40 @@
       width: min(980px, 100%)
     }
 
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.25rem;
+      text-align: left;
+      gap: 1rem;
+    }
+
     h1 {
       margin: 0 0 1rem
+    }
+
+    .page-header h1 {
+      margin-bottom: 0;
+    }
+
+    .config-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: .55rem 1rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      font-weight: 600;
+      transition: border-color .2s ease, background-color .2s ease;
+    }
+
+    .config-link:hover {
+      background: rgba(88, 166, 255, .14);
+      border-color: var(--accent);
+      text-decoration: none;
     }
 
     h2 {
@@ -320,6 +352,21 @@
       width: min(1400px, 100%)
     }
 
+    @media (max-width: 600px) {
+      .page-header {
+        flex-direction: column;
+        text-align: center;
+      }
+
+      .page-header h1 {
+        margin: 0;
+      }
+
+      .config-link {
+        width: 100%;
+      }
+    }
+
     /* let page be wider than before */
 
     /* Table wrapper that can grow but has a max width */
@@ -392,7 +439,10 @@
 
 <body>
   <div class="wrap">
-    <h1>Admin</h1>
+    <div class="page-header">
+      <h1>Admin</h1>
+      <a class="config-link" href="/admin/config">Manage config</a>
+    </div>
 
     <div class="row">
       <!-- Add link -->
@@ -477,7 +527,7 @@
             <form action="/admin/delete" method="post">
               <input type="hidden" name="keyword" value="{{row['keyword']}}">
               <button class="danger" type="submit"
-                onclick="return confirm('Delete {{row['keyword']}}?')">Delete</button>
+                onclick="return confirm('Delete {{row[',keyword,']}}?')">Delete</button>
             </form>
           </td>
         </tr>

@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>go — Config</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --panel: #161b22;
+      --text: #c9d1d9;
+      --muted: #8b949e;
+      --border: #30363d;
+      --accent: #58a6ff;
+      --danger: #f85149;
+      --success: #3fb950;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
+      line-height: 1.5;
+      display: flex;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    .wrap {
+      width: min(800px, 100%);
+    }
+
+    .page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.6rem, 2.4vw, 2.1rem);
+    }
+
+    .page-header a {
+      padding: .5rem 1rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      font-weight: 600;
+      transition: border-color .2s ease, background-color .2s ease;
+    }
+
+    .page-header a:hover {
+      background: rgba(88, 166, 255, .14);
+      border-color: var(--accent);
+      text-decoration: none;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, .25);
+    }
+
+    form label {
+      display: block;
+      text-align: left;
+      margin-bottom: 1rem;
+      font-weight: 600;
+    }
+
+    form label span {
+      display: block;
+      color: var(--muted);
+      font-weight: 400;
+      margin-top: .3rem;
+      font-size: .95rem;
+    }
+
+    input[type="text"],
+    input[type="number"],
+    textarea {
+      width: 100%;
+      margin-top: .35rem;
+      font-size: 1rem;
+      padding: .6rem .75rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #0b1320;
+      color: var(--text);
+      outline: none;
+    }
+
+    textarea {
+      min-height: 7rem;
+      resize: vertical;
+    }
+
+    input:focus,
+    textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(88, 166, 255, .25);
+    }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      margin-bottom: 1rem;
+      text-align: left;
+    }
+
+    .checkbox-row input[type="checkbox"] {
+      width: 1.2rem;
+      height: 1.2rem;
+      accent-color: var(--accent);
+    }
+
+    .checkbox-row label {
+      margin: 0;
+      font-weight: 500;
+    }
+
+    button[type="submit"] {
+      margin-top: .5rem;
+      width: 100%;
+      padding: .75rem;
+      border-radius: 10px;
+      border: 1px solid transparent;
+      background: var(--accent);
+      color: #0b0f14;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: filter .2s ease;
+    }
+
+    button[type="submit"]:hover {
+      filter: brightness(1.08);
+    }
+
+    .flash {
+      margin-bottom: 1rem;
+      padding: .75rem 1rem;
+      border-radius: 8px;
+      border: 1px solid;
+    }
+
+    .flash.error {
+      border-color: rgba(248, 81, 73, .4);
+      background: rgba(248, 81, 73, .15);
+      color: #ffb4ae;
+    }
+
+    .flash.success {
+      border-color: rgba(63, 185, 80, .4);
+      background: rgba(63, 185, 80, .15);
+      color: #b4f5c4;
+    }
+
+    .flash.notice {
+      border-color: rgba(88, 166, 255, .4);
+      background: rgba(88, 166, 255, .15);
+      color: #c8e6ff;
+    }
+
+    @media (max-width: 640px) {
+      body {
+        padding: 1.5rem .75rem;
+      }
+
+      .page-header {
+        flex-direction: column;
+        align-items: stretch;
+        text-align: center;
+      }
+
+      .page-header a {
+        text-align: center;
+      }
+
+      button[type="submit"] {
+        font-size: 1.05rem;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="page-header">
+      <h1>Configuration</h1>
+      <a href="{{ url_for('admin.admin_home') }}">← Back to Admin</a>
+    </div>
+
+    {% if load_error %}
+    <div class="flash error">{{ load_error }}</div>
+    {% endif %}
+
+    {% if save_error %}
+    <div class="flash error">{{ save_error }}</div>
+    {% endif %}
+
+    {% if message %}
+    <div class="flash success">{{ message }}</div>
+    {% endif %}
+
+    <div class="card">
+      <form method="post">
+        <label for="host">Host
+          <input id="host" name="host" type="text" value="{{ form.host }}" required>
+        </label>
+
+        <label for="port">Port
+          <input id="port" name="port" type="number" min="1" max="65535" value="{{ form.port }}" required>
+        </label>
+
+        <div class="checkbox-row">
+          <input id="debug" name="debug" type="checkbox" {% if form.debug %}checked{% endif %}>
+          <label for="debug">Enable Flask debug mode</label>
+        </div>
+
+        <div class="checkbox-row">
+          <input id="allow_files" name="allow_files" type="checkbox" {% if form.allow_files %}checked{% endif %}>
+          <label for="allow_files">Allow opening local file paths</label>
+        </div>
+
+        <label for="db_path">Database path
+          <input id="db_path" name="db_path" type="text" value="{{ form.db_path }}" required>
+          <span>Absolute or product-relative path to the SQLite database file.</span>
+        </label>
+
+        <label for="fallback_url">Fallback search URL
+          <input id="fallback_url" name="fallback_url" type="text" value="{{ form.fallback_url }}"
+            placeholder="https://duckduckgo.com/?q={q}">
+          <span>Optional template used when no shortcuts match. Use <code>{q}</code> for the encoded query.</span>
+        </label>
+
+        <label for="file_allow">Allowed file roots
+          <textarea id="file_allow" name="file_allow"
+            placeholder="C:\\shortcuts, D:\\work\documents">{{ form.file_allow }}</textarea>
+          <span>One directory per line. Leave blank to disable local file openings.</span>
+        </label>
+
+        <button type="submit">Save configuration</button>
+      </form>
+    </div>
+  </div>
+</body>
+
+</html>
