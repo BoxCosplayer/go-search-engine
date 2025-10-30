@@ -29,7 +29,15 @@ try:
 except ImportError:  # pragma: no cover
     slugify = None  # type: ignore
 
-
+_DEFAULT_CONFIG = {
+    "host": "127.0.0.1",
+    "port": 5000,
+    "debug": False,
+    "db-path": "backend/app/data/links.db",
+    "allow-files": True,
+    "fallback-url": "",
+    "file-allow": [],
+}
 _ARG_INDEX_RE = re.compile(r"\{(\d+)\}")
 _TRAILING_PUNCT_RE = re.compile(r"[\s'\"`#@)\]\},.!?:;]+$")
 
@@ -181,9 +189,27 @@ def _discover_config_path() -> Path:
     return Path(__file__).resolve().parents[2] / "config.json"
 
 
+def _ensure_config_file_exists() -> Path:
+    """Ensure config.json is present, creating an example if missing."""
+
+    cfg_path = _discover_config_path()
+    if cfg_path.exists():
+        return cfg_path
+
+    template_path = cfg_path.with_name("config-template.txt")
+    try:
+        if template_path.exists():
+            contents = template_path.read_text(encoding="utf-8")
+        else:
+            contents = json.dumps(_DEFAULT_CONFIG, indent=4) + "\n"
+        cfg_path.write_text(contents, encoding="utf-8")
+    except OSError as exc:  # pragma: no cover - filesystem guard
+        raise OSError(f"Failed to create default config: {exc}") from exc
+    return cfg_path
+
 def load_config() -> GoConfig:
     """Load and validate config.json using Pydantic."""
-    cfg_path = _discover_config_path()
+    cfg_path = _ensure_config_file_exists()
     try:
         data = json.loads(cfg_path.read_text(encoding="utf-8"))
     except FileNotFoundError as e:
