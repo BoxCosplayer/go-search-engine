@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0
+
+- Merged all config variables into references for config.json
+- Added new configurables:
+    - "file_allow" for whitelisitng filepaths where files cna be opened
+    - optional debug mode for development purposes
+    - configurable fallback_url instead of just using google
+
 ## 0.1.4
 
 - Fixed slugify / python-slugify conflicts for lists
