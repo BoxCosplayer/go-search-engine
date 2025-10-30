@@ -207,6 +207,7 @@ def _ensure_config_file_exists() -> Path:
         raise OSError(f"Failed to create default config: {exc}") from exc
     return cfg_path
 
+
 def load_config() -> GoConfig:
     """Load and validate config.json using Pydantic."""
     cfg_path = _ensure_config_file_exists()

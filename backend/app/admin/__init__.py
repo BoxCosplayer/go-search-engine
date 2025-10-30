@@ -2,8 +2,8 @@ import json
 
 from flask import Blueprint, abort, redirect, render_template, request
 
-from ..db import ensure_lists_schema, get_db, init_db
 from .. import utils
+from ..db import ensure_lists_schema, get_db, init_db
 from ..utils import GoConfig, _discover_config_path, load_config, to_slug
 
 admin_bp = Blueprint("admin", __name__)
