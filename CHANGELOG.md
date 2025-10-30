@@ -1,5 +1,12 @@
 # Changelog
 
+## [Major Versions Log](#major-versions-log)
+
+## 0.2.2
+
+- Added admin UI to change and update the config
+- Added "Major Verions Log" to the changelog
+
 ## 0.2.1
 
 - Bugfix where empty directory allowed for all files to be run
@@ -44,3 +51,11 @@
 - PyInstaller spec bundles templates for the exe.
 - Switched to `python-slugify` for slug generation.
 - Minor fixes and cleanup (schema init, duplicate helpers removed).
+
+
+
+# Major Versions Log
+
+0.2 - Config Overhaul
+0.1 - Initial Project Publication
+0.0 - Private project development, for private use
