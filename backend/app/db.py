@@ -4,6 +4,8 @@ import sys
 
 from flask import g
 
+from .utils import config
+
 
 def _base_dir() -> str:
     """Return the base directory for app data.
@@ -19,7 +21,7 @@ def _base_dir() -> str:
 
 BASE_DIR = _base_dir()
 
-DB_PATH = os.environ.get("GO_DB_PATH", os.path.join(BASE_DIR, "data", "links.db"))
+DB_PATH = config.db_path
 
 
 def get_db():
@@ -103,25 +105,4 @@ def init_app(app):
     Args:
         app: The Flask application instance.
     """
-    migrate_old_db_if_present()
     app.teardown_appcontext(close_db)
-
-
-def migrate_old_db_if_present():
-    """Move an old root-level data/links.db into the new package data path.
-
-    Old path: <project_root>/data/links.db
-    New path: BASE_DIR/data/links.db
-    """
-    try:
-        backend_dir = os.path.dirname(BASE_DIR)
-        project_root = os.path.dirname(backend_dir)
-        old_path = os.path.join(project_root, "data", "links.db")
-        new_dir = os.path.join(BASE_DIR, "data")
-        new_path = os.path.join(new_dir, "links.db")
-        if os.path.exists(old_path) and not os.path.exists(new_path):
-            os.makedirs(new_dir, exist_ok=True)
-            os.replace(old_path, new_path)
-    except Exception:
-        # Non-fatal; continue without migration
-        pass

@@ -16,6 +16,7 @@ from .db import DB_PATH, ensure_lists_schema, get_db
 from .db import init_app as db_init_app
 from .lists import lists_bp
 from .utils import (
+    config,
     file_url_to_path,
     is_allowed_path,
     open_path_with_os,
@@ -34,6 +35,11 @@ except Exception:
 
     # 64x64 simple dark badge with "go"
 
+HOST = config.host
+PORT = config.port
+DEBUG = config.debug
+FALLBACK_URL_TEMPLATE = config.fallback_url  # e.g. "https://duckduckgo.com/?q={q}"
+ALLOW_FILES = config.allow_files
 
 def _make_tray_image():
     """Create an in-memory tray icon image.
@@ -118,9 +124,6 @@ def load_config():
             return json.load(f) or {}
     except Exception:
         return {}
-
-
-FALLBACK_URL_TEMPLATE = os.environ.get("GO_FALLBACK_URL_TEMPLATE", "")  # e.g. "https://duckduckgo.com/?q={q}"
 
 if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
     _TEMPLATES_DIR = os.path.join(sys._MEIPASS, "backend", "app", "templates")  # type: ignore[attr-defined]
@@ -211,16 +214,14 @@ def go():
                 return (f"Bad file URL: {e}", 400)
 
             # Safety: only allow local opens (keep server bound to 127.0.0.1) and/or allowlist
-            if request.host.split(":")[0] not in ("127.0.0.1", "localhost") and not os.environ.get(
-                "GO_FILE_ALLOW"
-            ):
+            if request.host.split(":")[0] not in ("127.0.0.1", "localhost") and not ALLOW_FILES:
                 return (
-                    "Refusing to open local files over non-localhost. Bind to 127.0.0.1 or set GO_FILE_ALLOW.",
+                    "Refusing to open local files over non-localhost. Bind to 127.0.0.1 or set ALLOW_FILES.",
                     403,
                 )
 
             if not is_allowed_path(path):
-                return ("Path not allowed. Set GO_FILE_ALLOW to include this directory.", 403)
+                return ("Path not allowed. Set ALLOW_FILES to include this directory.", 403)
 
             if not (os.path.exists(path)):
                 return (f"File/folder not found: {path}", 404)
@@ -290,19 +291,15 @@ if __name__ == "__main__":
         """)
         db.commit()
 
-    host = os.environ.get("GO_HOST", "127.0.0.1")
-    port = int(os.environ.get("PORT", "5000"))
-    debug = os.environ.get("FLASK_DEBUG", "0") == "1"
-
     def _run_server():
         """Run the Flask development server (no reloader)."""
-        app.run(host=host, port=port, debug=debug, use_reloader=False)
+        app.run(host=HOST, port=PORT, debug=DEBUG, use_reloader=False)
 
     t = threading.Thread(target=_run_server, daemon=True)
     t.start()
 
     if pystray is not None:
-        base_url = f"http://{host}:{port}"
+        base_url = f"http://{HOST}:{PORT}"
 
         def open_home(icon, _):
             webbrowser.open(f"{base_url}/")
@@ -316,7 +313,7 @@ if __name__ == "__main__":
 
         image = _make_tray_image()
         menu = Menu(
-            item(f"Running on {host}:{port}", None, enabled=False),
+            item(f"Running on {HOST}:{PORT}", None, enabled=False),
             item("Open Home", open_home),
             item("Open Admin", open_admin),
             item("Quit", quit_app),

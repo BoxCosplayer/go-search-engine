@@ -1,9 +1,23 @@
+import json
 import os
 import re
 import subprocess
 import sys
+from pathlib import Path
 from urllib.parse import quote, quote_plus, urlparse
 from urllib.request import url2pathname
+
+try:
+    from pydantic import BaseModel, Field, ValidationError
+    try:
+        from pydantic import ConfigDict  # v2
+    except Exception:  # pragma: no cover
+        ConfigDict = None  # type: ignore
+except Exception:  # pragma: no cover
+    BaseModel = object  # type: ignore
+    Field = lambda *a, **k: None  # type: ignore
+    ValidationError = Exception  # type: ignore
+    ConfigDict = None  # type: ignore
 
 try:
     # Provided by the python-slugify package
@@ -98,16 +112,22 @@ def file_url_to_path(url: str) -> str:
 
 
 def is_allowed_path(path: str) -> bool:
-    """Return True if path is within any GO_FILE_ALLOW root (or allowed by default)."""
-    allow_env = os.environ.get("GO_FILE_ALLOW", "").strip()
-    if not allow_env:
+    """Return True if path is within any configured allowed root.
+
+    Uses config.file_allow (list of absolute directories). If empty, allow all paths.
+    """
+    roots: list[str] = []
+    try:
+        roots = getattr(config, "file_allow", [])  # type: ignore[name-defined]
+    except Exception:
+        pass
+    if not roots:
         return True
-    roots = [p for p in (x.strip() for x in allow_env.split(";")) if p]
     try:
         path = os.path.abspath(path)
         for root in roots:
-            root = os.path.abspath(root)
-            if os.path.commonpath([path, root]) == root:
+            root_abs = os.path.abspath(str(root))
+            if os.path.commonpath([path, root_abs]) == root_abs:
                 return True
     except Exception:
         pass
@@ -124,15 +144,49 @@ def open_path_with_os(path: str) -> None:
         subprocess.Popen(["xdg-open", path])
 
 
-def load_config():
-    """Load JSON config from GO_CONFIG_PATH or repo config.json (best-effort)."""
-    cfg_path = os.environ.get("GO_CONFIG_PATH") or os.path.join(
-        os.path.dirname(__file__), "..", "..", "config.json"
-    )
-    try:
-        with open(os.path.abspath(cfg_path), encoding="utf-8") as f:
-            import json
+class GoConfig(BaseModel):
+    """Application configuration validated by Pydantic."""
 
-            return json.load(f) or {}
-    except Exception:
-        return {}
+    host: str = "127.0.0.1"
+    port: int = 5000
+    debug: bool = False
+    db_path: str = Field("backend/app/data/links.db", alias="db-path")
+    allow_files: bool = Field(False, alias="allow-files")
+    fallback_url: str = Field("", alias="fallback-url")
+    file_allow: list[str] = Field(default_factory=list, alias="file-allow")
+
+    # Pydantic v2 config if available; fallback to v1
+    if ConfigDict:
+        model_config = ConfigDict(populate_by_name=True, extra="ignore")  # type: ignore[assignment]
+    else:  # type: ignore[no-redef]
+        class Config:  # type: ignore[override]
+            allow_population_by_field_name = True
+            extra = "ignore"
+
+
+def _discover_config_path() -> Path:
+    """Return absolute path to the project-root config.json.
+
+    Assumes config.json is always located at the repository root
+    (two directories above this file).
+    """
+    return Path(__file__).resolve().parents[2] / "config.json"
+
+
+def load_config() -> GoConfig:
+    """Load and validate config.json using Pydantic."""
+    cfg_path = _discover_config_path()
+    try:
+        data = json.loads(cfg_path.read_text(encoding="utf-8"))
+    except FileNotFoundError as e:
+        raise FileNotFoundError(f"Config file not found: {cfg_path}") from e
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid JSON in {cfg_path}: {e}") from e
+    try:
+        return GoConfig(**data)
+    except ValidationError as e:
+        raise ValueError(f"Invalid configuration: {e}") from e
+
+
+# Importable, validated configuration object
+config = load_config()
