@@ -9,13 +9,17 @@ from urllib.request import url2pathname
 
 try:
     from pydantic import BaseModel, Field, ValidationError
+
     try:
         from pydantic import ConfigDict  # v2
     except Exception:  # pragma: no cover
         ConfigDict = None  # type: ignore
 except Exception:  # pragma: no cover
     BaseModel = object  # type: ignore
-    Field = lambda *a, **k: None  # type: ignore
+
+    def Field(*a, **k):  # type: ignore
+        return None
+
     ValidationError = Exception  # type: ignore
     ConfigDict = None  # type: ignore
 
@@ -117,12 +121,15 @@ def is_allowed_path(path: str) -> bool:
     Uses config.file_allow (list of absolute directories). If empty, allow all paths.
     """
     roots: list[str] = []
-    try:
-        roots = getattr(config, "file_allow", [])  # type: ignore[name-defined]
-    except Exception:
-        pass
+    # try:
+    #     roots = getattr(config, "file_allow", [])  # type: ignore[name-defined]
+    # except Exception:
+    #     pass
+
+    roots = getattr(config, "file_allow", [])  # type: ignore[name-defined]
+
     if not roots:
-        return True
+        return False
     try:
         path = os.path.abspath(path)
         for root in roots:
@@ -159,6 +166,7 @@ class GoConfig(BaseModel):
     if ConfigDict:
         model_config = ConfigDict(populate_by_name=True, extra="ignore")  # type: ignore[assignment]
     else:  # type: ignore[no-redef]
+
         class Config:  # type: ignore[override]
             allow_population_by_field_name = True
             extra = "ignore"

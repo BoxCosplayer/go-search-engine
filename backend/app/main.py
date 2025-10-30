@@ -41,6 +41,7 @@ DEBUG = config.debug
 FALLBACK_URL_TEMPLATE = config.fallback_url  # e.g. "https://duckduckgo.com/?q={q}"
 ALLOW_FILES = config.allow_files
 
+
 def _make_tray_image():
     """Create an in-memory tray icon image.
 
@@ -124,6 +125,7 @@ def load_config():
             return json.load(f) or {}
     except Exception:
         return {}
+
 
 if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
     _TEMPLATES_DIR = os.path.join(sys._MEIPASS, "backend", "app", "templates")  # type: ignore[attr-defined]

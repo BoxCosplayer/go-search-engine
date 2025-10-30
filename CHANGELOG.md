@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.1
+
+- Bugfix where empty directory allowed for all files to be run
+- Ruff format
+
 ## 0.2.0
 
 - Merged all config variables into references for config.json
