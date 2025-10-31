@@ -88,7 +88,7 @@ You can point the app at another config file by setting the `GO_CONFIG_PATH` env
 
 ## Admin tools
 
-- `/admin`: list, add, delete, and tag shortcuts; auto creates list links.
+- `/admin`: list, add, edit, delete, and tag shortcuts; auto creates list links.
 - `/admin/config`: edit `config.json` through the browser (writes back to disk).
 - `/lists`: browse lists and view individual list pages.
 - `/healthz`: simple health probe for monitoring.
@@ -98,6 +98,7 @@ The admin UI has no authentication and is intended for local use only.
 ## Managing shortcuts
 
 - Open `http://127.0.0.1:5000/admin` to add or delete shortcuts through the form.
+- Use the Edit button on an existing row to tweak keywords, titles, or URLs; the form is pre-filled for convenience.
 - Assign comma separated list slugs via the "Set lists" action; missing lists are created automatically.
 - File shortcuts should use `file://` URLs. Ensure `allow-files` is true and the target directory is listed in `file-allow`.
 
@@ -139,6 +140,7 @@ The script creates the base schema plus list tables so the admin UI works immedi
 
 - `GET /api/links` -- list all links.
 - `POST /api/links` -- add a link (`{"keyword":"gh","url":"https://github.com","title":"GitHub"}`).
+- `PUT /api/links/<keyword>` -- update a link. Provide any updated `keyword`, `title`, or `url` fields.
 - `GET /api/lists` -- list lists.
 - `POST /api/lists` -- add a list (`{"slug":"work","name":"Work Projects","description":"..."}`).
 

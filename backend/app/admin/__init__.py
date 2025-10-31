@@ -1,4 +1,5 @@
 import json
+import sqlite3
 
 from flask import Blueprint, abort, redirect, render_template, request
 
@@ -33,8 +34,21 @@ def admin_home():
         """
     ).fetchall()
 
+    edit_key = (request.args.get("edit") or "").strip()
+    edit_row = None
+    if edit_key:
+        edit_row = db.execute(
+            "SELECT keyword, title, url FROM links WHERE lower(keyword)=lower(?)",
+            (edit_key,),
+        ).fetchone()
+
     all_lists = db.execute("SELECT slug, name FROM lists ORDER BY name COLLATE NOCASE").fetchall()
-    return render_template("admin/index.html", rows=rows, all_lists=all_lists)
+    return render_template(
+        "admin/index.html",
+        rows=rows,
+        all_lists=all_lists,
+        edit_row=dict(edit_row) if edit_row else None,
+    )
 
 
 def _config_to_form_data(cfg: GoConfig) -> dict[str, object]:
@@ -166,6 +180,34 @@ def admin_delete():
     db.execute("DELETE FROM links WHERE lower(keyword) = lower(?)", (keyword,))
     db.commit()
     return redirect("/admin")
+
+
+@admin_bp.route("/update", methods=["POST"])
+def admin_update():
+    """Update an existing link."""
+    original = (request.form.get("original_keyword") or "").strip()
+    keyword = (request.form.get("keyword") or "").strip()
+    url = (request.form.get("url") or "").strip()
+    title = (request.form.get("title") or "").strip() or None
+
+    if not original or not keyword or not url:
+        abort(400, "original_keyword, keyword and url are required")
+
+    db = get_db()
+    row = db.execute("SELECT id FROM links WHERE lower(keyword)=lower(?)", (original,)).fetchone()
+    if not row:
+        abort(404, "link not found")
+
+    try:
+        db.execute(
+            "UPDATE links SET keyword=?, url=?, title=? WHERE id=?",
+            (keyword, url, title, row["id"]),
+        )
+        db.commit()
+    except sqlite3.IntegrityError:
+        abort(400, f"Keyword '{keyword}' already exists")
+
+    return redirect(f"/admin?q={keyword}")
 
 
 @admin_bp.route("/list-add", methods=["POST"])

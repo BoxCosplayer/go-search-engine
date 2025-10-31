@@ -1,3 +1,5 @@
+import sqlite3
+
 from flask import Blueprint, request
 
 from ..db import ensure_lists_schema, get_db, init_db
@@ -43,6 +45,39 @@ def links():
 
     rows = db.execute("SELECT keyword, title, url FROM links ORDER BY keyword COLLATE NOCASE").fetchall()
     return {"links": [dict(r) for r in rows]}
+
+
+@api_bp.route("/links/<keyword>", methods=["PUT", "PATCH"])
+def update_link(keyword: str):
+    """Update an existing link."""
+    db = get_db()
+    row = db.execute(
+        "SELECT id, keyword, title, url FROM links WHERE lower(keyword)=lower(?)",
+        (keyword,),
+    ).fetchone()
+    if not row:
+        return {"error": "link not found"}, 404
+
+    data = request.get_json(silent=True) or {}
+    new_keyword = (data.get("keyword") or row["keyword"]).strip()
+    new_url = (data.get("url") or row["url"]).strip()
+    new_title = (data.get("title") or row["title"] or "").strip() or None
+
+    if not new_keyword or not new_url:
+        return {"error": "keyword and url are required"}, 400
+    if not (new_url.startswith("http://") or new_url.startswith("https://")):
+        return {"error": "url must start with http:// or https://"}, 400
+
+    try:
+        db.execute(
+            "UPDATE links SET keyword=?, url=?, title=? WHERE id=?",
+            (new_keyword, new_url, new_title, row["id"]),
+        )
+        db.commit()
+    except sqlite3.IntegrityError:
+        return {"error": f"keyword '{new_keyword}' already exists"}, 400
+
+    return {"ok": True, "link": {"keyword": new_keyword, "title": new_title, "url": new_url}}
 
 
 @api_bp.route("/lists", methods=["GET", "POST"])

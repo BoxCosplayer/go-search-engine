@@ -336,6 +336,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      gap: .5rem;
     }
 
     td.actions form {
@@ -445,7 +446,24 @@
     </div>
 
     <div class="row">
-      <!-- Add link -->
+      <!-- Add / Edit link -->
+      {% if edit_row %}
+      <form action="/admin/update" method="post" class="add-form">
+        <h2>Edit link</h2>
+        <input type="hidden" name="original_keyword" value="{{ edit_row['keyword'] }}">
+        <label>Keyword
+          <input name="keyword" required value="{{ edit_row['keyword'] }}">
+        </label>
+        <label>Title
+          <input name="title" value="{{ edit_row['title'] or '' }}">
+        </label>
+        <label>URL
+          <input name="url" required value="{{ edit_row['url'] }}">
+        </label>
+        <button type="submit">Save changes</button>
+        <p class="meta"><a href="/admin">Cancel</a></p>
+      </form>
+      {% else %}
       <form action="/admin/add" method="post" class="add-form">
         <h2>Add link</h2>
         <label>Keyword
@@ -459,6 +477,7 @@
         </label>
         <button type="submit">Save</button>
       </form>
+      {% endif %}
 
       <!-- Create list -->
       <form action="/admin/list-add" method="post" class="list-form">
@@ -524,6 +543,10 @@
             {% endif %}
           </td>
           <td class="actions">
+            <form action="/admin" method="get">
+              <input type="hidden" name="edit" value="{{row['keyword']}}">
+              <button type="submit">Edit</button>
+            </form>
             <form action="/admin/delete" method="post">
               <input type="hidden" name="keyword" value="{{row['keyword']}}">
               <button class="danger" type="submit"

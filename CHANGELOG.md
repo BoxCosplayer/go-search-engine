@@ -2,6 +2,11 @@
 
 ## [Major Versions Log](#major-versions-log)
 
+## 0.2.3
+
+- Added ability to edit existing links from the admin UI
+- Added `PUT /api/links/<keyword>` for API interaction
+
 ## 0.2.2
 
 - Added admin UI to change and update the config
@@ -57,6 +62,6 @@
 
 # Major Versions Log
 
-0.2 - Config Overhaul
+0.2 - Config Overhaul + extra admin powers
 0.1 - Initial Project Publication
 0.0 - Private project development, for private use
