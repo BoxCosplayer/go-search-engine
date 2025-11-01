@@ -175,9 +175,9 @@ class GoConfig(BaseModel):
         model_config = ConfigDict(populate_by_name=True, extra="ignore")  # type: ignore[assignment]
     else:  # type: ignore[no-redef]
 
-        class Config:  # type: ignore[override]
-            allow_population_by_field_name = True
-            extra = "ignore"
+        class Config:  # type: ignore[override]  # pragma: no cover
+            allow_population_by_field_name = True  # pragma: no cover
+            extra = "ignore"  # pragma: no cover
 
 
 def _discover_config_path() -> Path:

@@ -30,7 +30,7 @@ try:
     from PIL import Image, ImageDraw, ImageFont
     from pystray import Menu
     from pystray import MenuItem as item
-except Exception:
+except Exception:  # pragma: no cover
     pystray = None  # we'll run without a tray if deps are missing
 
     # 64x64 simple dark badge with "go"
@@ -127,7 +127,7 @@ def load_config():
         return {}
 
 
-if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):  # pragma: no cover
     _TEMPLATES_DIR = os.path.join(sys._MEIPASS, "backend", "app", "templates")  # type: ignore[attr-defined]
 else:
     _TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), "templates")
@@ -279,7 +279,7 @@ def go():
 # ---- Minimal admin UI (no auth, intended for localhost only) ----
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     base_dir = os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else os.path.dirname(__file__)
     os.makedirs(os.path.join(base_dir, "data"), exist_ok=True)
     with sqlite3.connect(DB_PATH) as db:

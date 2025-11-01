@@ -115,5 +115,5 @@ def main():
             print("Initialized DB at", DB_PATH)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()
