@@ -1,4 +1,5 @@
 import sqlite3
+from contextlib import suppress
 
 from flask import Blueprint, request
 
@@ -216,7 +217,7 @@ def list_detail(slug: str):
             return {"error": f"slug '{new_slug}' already exists"}, 400
 
         # Update the auto-created shortcut link if it exists (best effort).
-        try:
+        with suppress(Exception):
             base_url = request.host_url.rstrip("/")
             list_url = f"{base_url}/lists/{new_slug}"
             title = f"List - {new_name}"
@@ -225,8 +226,6 @@ def list_detail(slug: str):
                 (new_slug, list_url, title, slug),
             )
             db.commit()
-        except Exception:
-            pass
 
         return {"ok": True, "list": {"slug": new_slug, "name": new_name, "description": new_desc}}
 
@@ -234,10 +233,8 @@ def list_detail(slug: str):
     if not info:
         return {"error": "list not found"}, 404
     db.execute("DELETE FROM lists WHERE id=?", (info["id"],))
-    try:
+    with suppress(Exception):
         db.execute("DELETE FROM links WHERE lower(keyword)=lower(?)", (slug,))
-    except Exception:
-        pass
     db.commit()
     return {"ok": True}
 
