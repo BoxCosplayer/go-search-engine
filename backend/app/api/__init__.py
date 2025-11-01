@@ -47,6 +47,19 @@ def links():
     return {"links": [dict(r) for r in rows]}
 
 
+@api_bp.route("/links/<keyword>", methods=["GET"])
+def get_link(keyword: str):
+    """Return details for a single link (case-insensitive keyword lookup)."""
+    db = get_db()
+    row = db.execute(
+        "SELECT keyword, title, url FROM links WHERE lower(keyword)=lower(?)",
+        (keyword,),
+    ).fetchone()
+    if not row:
+        return {"error": "link not found"}, 404
+    return {"link": dict(row)}
+
+
 @api_bp.route("/links/<keyword>", methods=["PUT", "PATCH"])
 def update_link(keyword: str):
     """Update an existing link."""
@@ -78,6 +91,21 @@ def update_link(keyword: str):
         return {"error": f"keyword '{new_keyword}' already exists"}, 400
 
     return {"ok": True, "link": {"keyword": new_keyword, "title": new_title, "url": new_url}}
+
+
+@api_bp.route("/links/<keyword>", methods=["DELETE"])
+def delete_link(keyword: str):
+    """Delete a link by keyword (case-insensitive)."""
+    db = get_db()
+    row = db.execute(
+        "SELECT id FROM links WHERE lower(keyword)=lower(?)",
+        (keyword,),
+    ).fetchone()
+    if not row:
+        return {"error": "link not found"}, 404
+    db.execute("DELETE FROM links WHERE id=?", (row["id"],))
+    db.commit()
+    return {"ok": True}
 
 
 @api_bp.route("/lists", methods=["GET", "POST"])
@@ -133,3 +161,150 @@ def lists():
 
     rows = db.execute("SELECT slug,name,description FROM lists ORDER BY name COLLATE NOCASE").fetchall()
     return {"lists": [dict(r) for r in rows]}
+
+
+@api_bp.route("/lists/<slug>", methods=["GET", "PUT", "PATCH", "DELETE"])
+def list_detail(slug: str):
+    """CRUD operations for a single list (case-insensitive slug lookup)."""
+    db = get_db()
+    ensure_lists_schema(db)
+    info = db.execute(
+        "SELECT id, slug, name, description FROM lists WHERE lower(slug)=lower(?)",
+        (slug,),
+    ).fetchone()
+
+    if request.method == "GET":
+        if not info:
+            return {"error": "list not found"}, 404
+        rows = db.execute(
+            """
+            SELECT l.keyword, l.title, l.url
+            FROM links l
+            JOIN link_lists ll ON ll.link_id = l.id
+            WHERE ll.list_id = ?
+            ORDER BY l.keyword COLLATE NOCASE
+            """,
+            (info["id"],),
+        ).fetchall()
+        return {
+            "list": {
+                "slug": info["slug"],
+                "name": info["name"],
+                "description": info["description"],
+            },
+            "links": [dict(r) for r in rows],
+        }
+
+    if request.method in {"PUT", "PATCH"}:
+        if not info:
+            return {"error": "list not found"}, 404
+        data = request.get_json(silent=True) or {}
+        new_slug = (data.get("slug") or info["slug"]).strip()
+        new_name = (data.get("name") or info["name"]).strip()
+        new_desc = (data.get("description") or info["description"] or "").strip() or None
+        if not new_slug:
+            return {"error": "slug required"}, 400
+        if not new_name:
+            new_name = new_slug.replace("-", " ").title()
+        try:
+            db.execute(
+                "UPDATE lists SET slug=?, name=?, description=? WHERE id=?",
+                (new_slug, new_name, new_desc, info["id"]),
+            )
+            db.commit()
+        except sqlite3.IntegrityError:
+            return {"error": f"slug '{new_slug}' already exists"}, 400
+
+        # Update the auto-created shortcut link if it exists (best effort).
+        try:
+            base_url = request.host_url.rstrip("/")
+            list_url = f"{base_url}/lists/{new_slug}"
+            title = f"List - {new_name}"
+            db.execute(
+                "UPDATE links SET keyword=?, url=?, title=? WHERE lower(keyword)=lower(?)",
+                (new_slug, list_url, title, slug),
+            )
+            db.commit()
+        except Exception:
+            pass
+
+        return {"ok": True, "list": {"slug": new_slug, "name": new_name, "description": new_desc}}
+
+    # DELETE branch
+    if not info:
+        return {"error": "list not found"}, 404
+    db.execute("DELETE FROM lists WHERE id=?", (info["id"],))
+    try:
+        db.execute("DELETE FROM links WHERE lower(keyword)=lower(?)", (slug,))
+    except Exception:
+        pass
+    db.commit()
+    return {"ok": True}
+
+
+@api_bp.route("/lists/<slug>/links", methods=["GET", "POST"])
+def list_links(slug: str):
+    """List or append links within a list."""
+    db = get_db()
+    ensure_lists_schema(db)
+    info = db.execute(
+        "SELECT id FROM lists WHERE lower(slug)=lower(?)",
+        (slug,),
+    ).fetchone()
+    if not info:
+        return {"error": "list not found"}, 404
+
+    if request.method == "GET":
+        rows = db.execute(
+            """
+            SELECT l.keyword, l.title, l.url
+            FROM links l
+            JOIN link_lists ll ON ll.link_id = l.id
+            WHERE ll.list_id = ?
+            ORDER BY l.keyword COLLATE NOCASE
+            """,
+            (info["id"],),
+        ).fetchall()
+        return {"links": [dict(r) for r in rows]}
+
+    data = request.get_json(silent=True) or {}
+    keyword = (data.get("keyword") or "").strip()
+    if not keyword:
+        return {"error": "keyword required"}, 400
+    link = db.execute(
+        "SELECT id FROM links WHERE lower(keyword)=lower(?)",
+        (keyword,),
+    ).fetchone()
+    if not link:
+        return {"error": "link not found"}, 404
+    db.execute(
+        "INSERT OR IGNORE INTO link_lists(link_id, list_id) VALUES (?, ?)",
+        (link["id"], info["id"]),
+    )
+    db.commit()
+    return {"ok": True}
+
+
+@api_bp.route("/lists/<slug>/links/<keyword>", methods=["DELETE"])
+def remove_list_link(slug: str, keyword: str):
+    """Remove a link from a list."""
+    db = get_db()
+    ensure_lists_schema(db)
+    info = db.execute(
+        "SELECT id FROM lists WHERE lower(slug)=lower(?)",
+        (slug,),
+    ).fetchone()
+    if not info:
+        return {"error": "list not found"}, 404
+    link = db.execute(
+        "SELECT id FROM links WHERE lower(keyword)=lower(?)",
+        (keyword,),
+    ).fetchone()
+    if not link:
+        return {"error": "link not found"}, 404
+    db.execute(
+        "DELETE FROM link_lists WHERE link_id=? AND list_id=?",
+        (link["id"], info["id"]),
+    )
+    db.commit()
+    return {"ok": True}

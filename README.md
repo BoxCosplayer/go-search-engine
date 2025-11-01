@@ -140,9 +140,17 @@ The script creates the base schema plus list tables so the admin UI works immedi
 
 - `GET /api/links` -- list all links.
 - `POST /api/links` -- add a link (`{"keyword":"gh","url":"https://github.com","title":"GitHub"}`).
-- `PUT /api/links/<keyword>` -- update a link. Provide any updated `keyword`, `title`, or `url` fields.
+- `GET /api/links/<keyword>` -- fetch a single link by keyword (case-insensitive).
+- `PUT /api/links/<keyword>` -- update keyword/title/url for an existing link.
+- `DELETE /api/links/<keyword>` -- remove a link.
 - `GET /api/lists` -- list lists.
 - `POST /api/lists` -- add a list (`{"slug":"work","name":"Work Projects","description":"..."}`).
+- `GET /api/lists/<slug>` -- fetch list metadata with its member links.
+- `PUT /api/lists/<slug>` / `PATCH /api/lists/<slug>` -- update slug/name/description.
+- `DELETE /api/lists/<slug>` -- delete a list (link memberships cascade).
+- `GET /api/lists/<slug>/links` -- list link memberships for a list.
+- `POST /api/lists/<slug>/links` -- add an existing link to a list (`{"keyword":"..."}`).
+- `DELETE /api/lists/<slug>/links/<keyword>` -- remove a link from a list.
 
 All responses are JSON. There is no authentication; run it on trusted networks only.
 

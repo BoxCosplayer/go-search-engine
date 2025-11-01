@@ -2,6 +2,10 @@
 
 ## [Major Versions Log](#major-versions-log)
 
+## 0.2.4
+
+- Added full CRUD access to the API
+
 ## 0.2.3
 
 - Added ability to edit existing links from the admin UI
