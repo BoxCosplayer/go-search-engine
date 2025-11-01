@@ -1,6 +1,4 @@
-import sqlite3
 
-import pytest
 
 
 def test_links_endpoint_lists_existing(client):

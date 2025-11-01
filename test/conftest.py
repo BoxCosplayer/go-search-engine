@@ -1,11 +1,7 @@
 import json
-import os
-import runpy
 import sqlite3
-from pathlib import Path
 
 import pytest
-
 from backend.app import utils
 
 
@@ -67,8 +63,8 @@ def test_config(monkeypatch, tmp_path):
 @pytest.fixture()
 def app_ctx(test_config):
     """Provide a Flask app context with initialized schema."""
+    from backend.app.db import close_db, ensure_lists_schema, get_db, init_db
     from backend.app.main import app
-    from backend.app.db import ensure_lists_schema, get_db, init_db, close_db
 
     with app.app_context():
         init_db()

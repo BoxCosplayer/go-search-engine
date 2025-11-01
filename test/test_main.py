@@ -2,8 +2,6 @@ import os
 from pathlib import Path
 from urllib.parse import urlparse
 
-import pytest
-
 from backend.app import main
 
 

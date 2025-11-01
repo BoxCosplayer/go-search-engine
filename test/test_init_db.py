@@ -1,14 +1,12 @@
+import builtins
 import csv
-import os
+import importlib
 import sqlite3
 import sys
 from pathlib import Path
 
-import pytest
-
 import init_db
-import importlib
-import builtins
+import pytest
 
 
 def test_ensure_schema_creates_links_table(tmp_path):

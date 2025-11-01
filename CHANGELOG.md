@@ -2,6 +2,15 @@
 
 ## [Major Versions Log](#major-versions-log)
 
+## 0.3.1
+
+- Enforced pytest coverage in CI/CD
+
+## 0.3.0
+
+- Added 100% pytest Coverage
+
+
 ## 0.2.4
 
 - Added full CRUD access to the API
@@ -29,6 +38,7 @@
     - "file_allow" for whitelisitng filepaths where files cna be opened
     - optional debug mode for development purposes
     - configurable fallback_url instead of just using google
+
 
 ## 0.1.4
 
