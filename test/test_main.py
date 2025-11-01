@@ -23,12 +23,8 @@ def add_list(conn, slug, name, description=""):
 
 
 def link_to_list(conn, link_keyword, list_slug):
-    link_id = conn.execute(
-        "SELECT id FROM links WHERE keyword=?", (link_keyword,)
-    ).fetchone()["id"]
-    list_id = conn.execute(
-        "SELECT id FROM lists WHERE slug=?", (list_slug,)
-    ).fetchone()["id"]
+    link_id = conn.execute("SELECT id FROM links WHERE keyword=?", (link_keyword,)).fetchone()["id"]
+    list_id = conn.execute("SELECT id FROM lists WHERE slug=?", (list_slug,)).fetchone()["id"]
     conn.execute(
         "INSERT INTO link_lists(link_id, list_id) VALUES (?, ?)",
         (link_id, list_id),
@@ -166,6 +162,7 @@ def test_load_config_handles_missing_file(tmp_path, monkeypatch):
 
 def test_go_bad_file_url(client, db_conn, monkeypatch):
     add_link(db_conn, "local", "file:///::bad", "Bad File")
+
     def raises(_url):
         raise ValueError("bad")
 
@@ -196,6 +193,7 @@ def test_go_file_path_checks(client, db_conn, monkeypatch, tmp_path):
     assert rv.status_code == 404
 
     monkeypatch.setattr(os.path, "exists", lambda _p: True)
+
     def raises_open(_p):
         raise RuntimeError("fail")
 

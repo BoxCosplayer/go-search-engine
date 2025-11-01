@@ -20,7 +20,11 @@ def test_app_main_executes_backend(monkeypatch):
         return real_run_module(name, run_name=run_name)
 
     monkeypatch.setattr(runpy, "run_module", fake_run_module)
-    real_run_module = lambda name, run_name=None: {"name": name, "run_name": run_name}
+
+    def _stub_run_module(name, run_name=None):
+        return {"name": name, "run_name": run_name}
+
+    real_run_module = _stub_run_module
     fake_run_module("dummy")
     real_run_module = orig_run_module
     real_run_module("app", run_name="__main__")
@@ -39,7 +43,11 @@ def test_backend_dunder_main_executes_app(monkeypatch):
         return real_run_module(name, run_name=run_name)
 
     monkeypatch.setattr(runpy, "run_module", fake_run_module)
-    real_run_module = lambda name, run_name=None: {"name": name, "run_name": run_name}
+
+    def _stub_run_module(name, run_name=None):
+        return {"name": name, "run_name": run_name}
+
+    real_run_module = _stub_run_module
     fake_run_module("dummy")
     real_run_module = orig_run_module
     real_run_module("backend.__main__", run_name="__main__")

@@ -15,13 +15,11 @@ def test_admin_home_lists_links(client, db_conn):
 
 
 def test_admin_home_edit_mode(client, db_conn):
-    db_conn.execute(
-        "INSERT INTO links(keyword, url, title) VALUES ('gh','https://github.com','GitHub')"
-    )
+    db_conn.execute("INSERT INTO links(keyword, url, title) VALUES ('gh','https://github.com','GitHub')")
     db_conn.commit()
     rv = client.get("/admin/", query_string={"edit": "gh"})
     assert rv.status_code == 200
-    assert b"value=\"https://github.com\"" in rv.data
+    assert b'value="https://github.com"' in rv.data
 
 
 def test_admin_config_get_and_post(client):
@@ -151,9 +149,7 @@ def test_admin_list_add_validation_and_duplicates(client):
 
 
 def test_admin_list_add_link_conflict(client, db_conn):
-    db_conn.execute(
-        "INSERT INTO links(keyword, url) VALUES ('dev-projects','https://example.com')"
-    )
+    db_conn.execute("INSERT INTO links(keyword, url) VALUES ('dev-projects','https://example.com')")
     db_conn.commit()
     rv = client.post("/admin/list-add", data={"name": "Dev Projects"})
     assert rv.status_code == 302  # success despite link conflict

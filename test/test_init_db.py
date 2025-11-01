@@ -13,9 +13,7 @@ def test_ensure_schema_creates_links_table(tmp_path):
     db_file = tmp_path / "links.sqlite"
     conn = sqlite3.connect(db_file)
     init_db.ensure_schema(conn)
-    row = conn.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='links'"
-    ).fetchone()
+    row = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='links'").fetchone()
     assert row[0] == "links"
     conn.close()
 

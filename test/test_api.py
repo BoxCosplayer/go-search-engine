@@ -1,6 +1,3 @@
-
-
-
 def test_links_endpoint_lists_existing(client):
     rv = client.get("/api/links")
     assert rv.status_code == 200

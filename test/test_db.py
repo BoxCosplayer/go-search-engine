@@ -11,9 +11,7 @@ def test_get_db_reuses_connection(app_ctx):
 def test_init_db_creates_links_table(app_ctx):
     init_db()
     conn = get_db()
-    row = conn.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='links'"
-    ).fetchone()
+    row = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='links'").fetchone()
     assert row["name"] == "links"
     close_db(None)
 
