@@ -2,6 +2,10 @@
 
 ## [Major Versions Log](#major-versions-log)
 
+## 0.3.2
+
+- Modularised the admin init file, splitting endpoints across different files
+
 ## 0.3.1
 
 - Enforced pytest coverage in CI/CD
@@ -76,6 +80,7 @@
 
 # Major Versions Log
 
+0.3 - Project Modularisation & testing
 0.2 - Config Overhaul + extra admin powers
 0.1 - Initial Project Publication
 0.0 - Private project development, for private use

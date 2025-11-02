@@ -1,6 +1,6 @@
 import json
 
-from backend.app import admin
+from backend.app.admin import config_routes
 
 
 def test_admin_home_lists_links(client, db_conn):
@@ -26,7 +26,7 @@ def test_admin_config_get_and_post(client):
     rv = client.get("/admin/config")
     assert rv.status_code == 200
 
-    cfg_path = admin._discover_config_path()
+    cfg_path = config_routes._discover_config_path()
     data = {
         "host": "0.0.0.0",
         "port": "6000",

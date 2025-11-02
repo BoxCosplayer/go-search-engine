@@ -53,9 +53,11 @@ def test_config(monkeypatch, tmp_path):
 
     # Patch admin helpers to reuse isolated config file
     from backend.app import admin as admin_mod
+    from backend.app.admin import config_routes as admin_config_routes
 
     monkeypatch.setattr(admin_mod.utils, "config", config_obj, raising=False)
     monkeypatch.setattr(admin_mod, "_discover_config_path", lambda: cfg_file, raising=False)
+    monkeypatch.setattr(admin_config_routes, "_discover_config_path", lambda: cfg_file, raising=False)
 
     return config_obj
 
