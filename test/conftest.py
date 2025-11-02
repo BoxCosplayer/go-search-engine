@@ -5,10 +5,8 @@ import pytest
 from backend.app import utils
 
 
-@pytest.fixture()
-def test_config(monkeypatch, tmp_path):
-    """Isolate configuration and database per-test."""
-
+def prepare_test_config(monkeypatch, tmp_path):
+    """Build and patch an isolated configuration environment."""
     db_file = tmp_path / "links.db"
     cfg_file = tmp_path / "config.json"
     cfg_data = {
@@ -23,6 +21,7 @@ def test_config(monkeypatch, tmp_path):
     cfg_file.write_text(json.dumps(cfg_data, indent=2), encoding="utf-8")
 
     config_obj = utils.GoConfig(**cfg_data)
+    config_obj._config_path = cfg_file  # convenience for tests
 
     # Patch utils module state
     monkeypatch.setattr(utils, "config", config_obj, raising=False)
@@ -60,6 +59,12 @@ def test_config(monkeypatch, tmp_path):
     monkeypatch.setattr(admin_config_routes, "_discover_config_path", lambda: cfg_file, raising=False)
 
     return config_obj
+
+
+@pytest.fixture()
+def test_config(monkeypatch, tmp_path):
+    """Isolate configuration and database per-test."""
+    return prepare_test_config(monkeypatch, tmp_path)
 
 
 @pytest.fixture()

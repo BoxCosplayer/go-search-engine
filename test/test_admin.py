@@ -46,6 +46,23 @@ def test_admin_config_get_and_post(client):
     assert blob["file-allow"] == ["/data", "/tmp"]
 
 
+def test_admin_module_reexports(monkeypatch, tmp_path):
+    from importlib import reload
+
+    from test.conftest import prepare_test_config
+
+    cfg = prepare_test_config(monkeypatch, tmp_path)
+
+    import backend.app.admin as admin_pkg
+
+    reloaded = reload(admin_pkg)
+    monkeypatch.setattr(reloaded, "_discover_config_path", lambda: cfg._config_path, raising=False)
+
+    assert reloaded.admin_bp.name == "admin"
+    assert reloaded.admin_add.__name__ == "admin_add"
+    assert reloaded.admin_list_delete.__name__ == "admin_list_delete"
+
+
 def test_admin_link_add_edit_delete(client, db_conn):
     data = {"keyword": "gh", "url": "https://github.com", "title": "GitHub"}
     rv = client.post("/admin/add", data=data)
