@@ -26,15 +26,22 @@ from .utils import (
 )
 
 try:
-    import pystray
-    from PIL import Image, ImageDraw, ImageFont
+    import pystray  # type: ignore
     from pystray import Menu
     from pystray import MenuItem as item
 except Exception:  # pragma: no cover
     pystray = None  # we'll run without a tray if deps are missing
+    Menu = None  # type: ignore[assignment]
+    item = None  # type: ignore[assignment]
 
-    # 64x64 simple dark badge with "go"
+try:
+    from PIL import Image, ImageDraw, ImageFont
+except Exception:  # pragma: no cover
+    Image = None  # type: ignore[assignment]
+    ImageDraw = None  # type: ignore[assignment]
+    ImageFont = None  # type: ignore[assignment]
 
+# 64x64 simple dark badge with "go"
 HOST = config.host
 PORT = config.port
 DEBUG = config.debug
@@ -57,6 +64,8 @@ def _make_tray_image():
     bg = (13, 17, 23, 255)  # #0d1117
     panel = (22, 27, 34, 255)  # #161b22
     accent = (88, 166, 255, 255)  # #58a6ff
+    if Image is None or ImageDraw is None:
+        raise RuntimeError("Pillow is required to render the tray image")
     img = Image.new("RGBA", (W, H), bg)
     d = ImageDraw.Draw(img)
     d.rounded_rectangle([6, 6, W - 6, H - 6], 12, fill=panel)
