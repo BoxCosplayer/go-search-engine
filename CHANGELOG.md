@@ -6,7 +6,7 @@
 
 - Added agents.md in project root
 - Documented / highlighted agents.md in readme & added contribution section
-- Published a public todos.md
+- Published "todos.md"
 
 ## 0.3.2
 
