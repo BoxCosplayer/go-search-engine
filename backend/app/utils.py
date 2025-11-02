@@ -118,8 +118,9 @@ def file_url_to_path(url: str) -> str:
         raise ValueError("not a file URL")
     path = url2pathname(u.path or "")
     if u.netloc and u.netloc.lower() not in ("", "localhost"):
-        # Build UNC path: \\server\share\path using f-string
-        path = f"\\\\{u.netloc}{path.replace('/', '\\')}"
+        # Build UNC path: \\server\share\path using a safely escaped backslash
+        unc_path = path.replace("/", "\\")
+        path = f"\\\\{u.netloc}{unc_path}"
     return os.path.normpath(path)
 
 
