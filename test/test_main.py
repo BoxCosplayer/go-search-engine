@@ -2,6 +2,8 @@ import os
 from pathlib import Path
 from urllib.parse import urlparse
 
+import pytest
+
 from backend.app import main
 
 
@@ -115,6 +117,13 @@ def test_make_tray_image_missing_font(monkeypatch):
     monkeypatch.setattr(main.ImageDraw.ImageDraw, "text", lambda self, *args, **kwargs: None, raising=False)
     img = main._make_tray_image()
     assert img.size == (64, 64)
+
+
+def test_make_tray_image_requires_pillow(monkeypatch):
+    monkeypatch.setattr(main, "Image", None)
+    monkeypatch.setattr(main, "ImageDraw", None)
+    with pytest.raises(RuntimeError):
+        main._make_tray_image()
 
 
 def test_base_dir_when_frozen(monkeypatch, tmp_path):
