@@ -49,6 +49,13 @@ FALLBACK_URL_TEMPLATE = config.fallback_url  # e.g. "https://duckduckgo.com/?q={
 ALLOW_FILES = config.allow_files
 
 
+def _require_pillow_modules():
+    """Return Pillow modules or raise when Pillow is unavailable."""
+    if Image is None or ImageDraw is None:
+        raise RuntimeError("Pillow is required to render the tray image")
+    return Image, ImageDraw, ImageFont
+
+
 def _make_tray_image():
     """Create an in-memory tray icon image.
 
@@ -64,15 +71,14 @@ def _make_tray_image():
     bg = (13, 17, 23, 255)  # #0d1117
     panel = (22, 27, 34, 255)  # #161b22
     accent = (88, 166, 255, 255)  # #58a6ff
-    if Image is None or ImageDraw is None:
-        raise RuntimeError("Pillow is required to render the tray image")
-    img = Image.new("RGBA", (W, H), bg)
-    d = ImageDraw.Draw(img)
+    image_mod, draw_mod, font_mod = _require_pillow_modules()
+    img = image_mod.new("RGBA", (W, H), bg)
+    d = draw_mod.Draw(img)
     d.rounded_rectangle([6, 6, W - 6, H - 6], 12, fill=panel)
     d.ellipse([10, 22, 26, 38], fill=accent)  # simple dot
     text = "go"
     try:
-        font = ImageFont.load_default()
+        font = font_mod.load_default() if font_mod is not None else None
     except Exception:
         font = None
     d.text((30, 22), text, fill=accent, font=font)

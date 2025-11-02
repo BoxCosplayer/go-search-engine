@@ -3,7 +3,6 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import pytest
-
 from backend.app import main
 
 
@@ -123,7 +122,7 @@ def test_make_tray_image_requires_pillow(monkeypatch):
     monkeypatch.setattr(main, "Image", None)
     monkeypatch.setattr(main, "ImageDraw", None)
     with pytest.raises(RuntimeError):
-        main._make_tray_image()
+        main._require_pillow_modules()
 
 
 def test_base_dir_when_frozen(monkeypatch, tmp_path):
