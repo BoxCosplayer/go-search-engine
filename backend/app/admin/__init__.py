@@ -6,7 +6,7 @@ from ..utils import _discover_config_path  # re-exported for tests and callers
 admin_bp = Blueprint("admin", __name__)
 
 # Import route modules to register handlers with the blueprint.
-from . import config_routes, home, links, lists  # noqa: F401
+from . import config_routes, home, links, lists  # noqa
 
 # Re-export route callables for backwards compatibility.
 admin_home = home.admin_home
