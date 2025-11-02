@@ -49,9 +49,9 @@ def test_admin_config_get_and_post(client):
 def test_admin_module_reexports(monkeypatch, tmp_path):
     from importlib import reload
 
-    from test.conftest import prepare_test_config
+    import conftest as test_support
 
-    cfg = prepare_test_config(monkeypatch, tmp_path)
+    cfg = test_support.prepare_test_config(monkeypatch, tmp_path)
 
     import backend.app.admin as admin_pkg
 
