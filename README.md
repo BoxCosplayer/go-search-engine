@@ -193,3 +193,16 @@ When run from a bundled executable, the app writes the SQLite database under `da
 ## License
 
 MIT. See `LICENSE` for details.
+
+## How to Contribute
+
+1. **Humans**
+   - Read the README and `todos.md` to see current priorities.
+   - Run `python -m venv .venv` (or `.\.venv\Scripts\activate` on Windows) and `pip install -r requirements.txt`.
+   - Use `.\.venv\Scripts\python.exe -m coverage run -m pytest` (Windows) or `python -m coverage run -m pytest` (Linux/macOS) to make sure all tests pass; `coverage report --fail-under=100` must hold green before you ship changes.
+   - Prefer focused commits with matching updates to docs (`README.md`, `CHANGELOG.md`, `todos.md`) when behavior shifts.
+   - Keep lint tidy with `ruff check` / `ruff format`. They run fast and match CI.
+
+2. **Automation / agents**
+   - Start by reading `agents.md`; it spells out the structure, testing expectations, and safe-edit guidelines tailored to this repo.
+   - When scripting edits, reuse the helper functions already in the blueprint modules and respect the re-export patterns described there.

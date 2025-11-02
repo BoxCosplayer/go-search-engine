@@ -2,6 +2,12 @@
 
 ## [Major Versions Log](#major-versions-log)
 
+## 0.3.3
+
+- Added agents.md in project root
+- Documented / highlighted agents.md in readme & added contribution section
+- Published a public todos.md
+
 ## 0.3.2
 
 - Modularised the admin init file, splitting endpoints across different files
