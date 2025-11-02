@@ -36,5 +36,5 @@ jobs:
       - name: Run pytest with coverage (require 100%)
         run: |
           coverage run -m pytest
-          coverage report --fail-under=100
           coverage report -m backend/app/main.py
+          coverage report --fail-under=100
