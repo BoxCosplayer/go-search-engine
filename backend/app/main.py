@@ -27,8 +27,8 @@ from .utils import (
 
 try:
     import pystray  # type: ignore
-    from pystray import Menu
-    from pystray import MenuItem as item
+    from pystray import Menu # pragma: no cover
+    from pystray import MenuItem as item # pragma: no cover
 except Exception:  # pragma: no cover
     pystray = None  # we'll run without a tray if deps are missing
     Menu = None  # type: ignore[assignment]
