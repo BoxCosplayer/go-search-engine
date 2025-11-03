@@ -12,6 +12,7 @@ def admin_add():
     keyword = (request.form.get("keyword") or "").strip()
     title = (request.form.get("title") or "").strip() or None
     url = (request.form.get("url") or "").strip()
+    search_enabled = int(bool(request.form.get("search_enabled")))
 
     if not keyword or not url:
         abort(400, "Keyword and URL required")
@@ -22,7 +23,10 @@ def admin_add():
     init_db()
     ensure_lists_schema(db)
     try:
-        db.execute("INSERT INTO links(keyword, url, title) VALUES (?, ?, ?)", (keyword, url, title))
+        db.execute(
+            "INSERT INTO links(keyword, url, title, search_enabled) VALUES (?, ?, ?, ?)",
+            (keyword, url, title, search_enabled),
+        )
         db.commit()
     except Exception:
         abort(400, f"Keyword '{keyword}' already exists")
@@ -48,6 +52,7 @@ def admin_update():
     keyword = (request.form.get("keyword") or "").strip()
     url = (request.form.get("url") or "").strip()
     title = (request.form.get("title") or "").strip() or None
+    search_enabled = int(bool(request.form.get("search_enabled")))
 
     if not original or not keyword or not url:
         abort(400, "original_keyword, keyword and url are required")
@@ -61,8 +66,8 @@ def admin_update():
 
     try:
         db.execute(
-            "UPDATE links SET keyword=?, url=?, title=? WHERE id=?",
-            (keyword, url, title, row["id"]),
+            "UPDATE links SET keyword=?, url=?, title=?, search_enabled=? WHERE id=?",
+            (keyword, url, title, search_enabled, row["id"]),
         )
         db.commit()
     except sqlite3.IntegrityError:

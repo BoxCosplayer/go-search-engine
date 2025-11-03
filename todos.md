@@ -11,11 +11,14 @@
 ~~add agents.md and reformat the whole thing~~
 ~~opensearch integration~~
 
-Search Flag
+~~Search Flag~~
+
+export/import
 
 fully rework readme:
     highlight dev installation
     add feature list
+    turn into a github wiki??
 
 imbed run on startup inapp
 add EXEs as releases

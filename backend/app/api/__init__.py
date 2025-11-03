@@ -9,6 +9,25 @@ from ..utils import to_slug
 api_bp = Blueprint("api", __name__)
 
 
+def _coerce_bool(value):
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int | float):
+        return bool(value)
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+    return False
+
+
+def _serialize_link(row):
+    return {
+        "keyword": row["keyword"],
+        "title": row["title"],
+        "url": row["url"],
+        "search_enabled": bool(row["search_enabled"]),
+    }
+
+
 @api_bp.route("/links", methods=["GET", "POST"])
 def links():
     """Links endpoint.
@@ -31,6 +50,11 @@ def links():
         keyword = (data.get("keyword") or "").strip()
         url = (data.get("url") or "").strip()
         title = (data.get("title") or "").strip() or None
+        raw_search = data.get("search_enabled")
+        if raw_search is None:
+            raw_search = data.get("searchEnabled")
+        search_enabled = _coerce_bool(raw_search)
+
         if not keyword or not url:
             return {"error": "keyword and url are required"}, 400
         if any(ch.isspace() for ch in keyword):
@@ -40,14 +64,19 @@ def links():
         init_db()
         ensure_lists_schema(get_db())
         try:
-            db.execute("INSERT INTO links(keyword, url, title) VALUES (?, ?, ?)", (keyword, url, title))
+            db.execute(
+                "INSERT INTO links(keyword, url, title, search_enabled) VALUES (?, ?, ?, ?)",
+                (keyword, url, title, int(search_enabled)),
+            )
             db.commit()
         except Exception:
             return {"error": f"keyword '{keyword}' already exists"}, 400
         return {"ok": True}
 
-    rows = db.execute("SELECT keyword, title, url FROM links ORDER BY keyword COLLATE NOCASE").fetchall()
-    return {"links": [dict(r) for r in rows]}
+    rows = db.execute(
+        "SELECT keyword, title, url, search_enabled FROM links ORDER BY keyword COLLATE NOCASE"
+    ).fetchall()
+    return {"links": [_serialize_link(r) for r in rows]}
 
 
 @api_bp.route("/links/<keyword>", methods=["GET"])
@@ -55,12 +84,12 @@ def get_link(keyword: str):
     """Return details for a single link (case-insensitive keyword lookup)."""
     db = get_db()
     row = db.execute(
-        "SELECT keyword, title, url FROM links WHERE lower(keyword)=lower(?)",
+        "SELECT keyword, title, url, search_enabled FROM links WHERE lower(keyword)=lower(?)",
         (keyword,),
     ).fetchone()
     if not row:
         return {"error": "link not found"}, 404
-    return {"link": dict(row)}
+    return {"link": _serialize_link(row)}
 
 
 @api_bp.route("/links/<keyword>", methods=["PUT", "PATCH"])
@@ -68,7 +97,7 @@ def update_link(keyword: str):
     """Update an existing link."""
     db = get_db()
     row = db.execute(
-        "SELECT id, keyword, title, url FROM links WHERE lower(keyword)=lower(?)",
+        "SELECT id, keyword, title, url, search_enabled FROM links WHERE lower(keyword)=lower(?)",
         (keyword,),
     ).fetchone()
     if not row:
@@ -78,6 +107,10 @@ def update_link(keyword: str):
     new_keyword = (data.get("keyword") or row["keyword"]).strip()
     new_url = (data.get("url") or row["url"]).strip()
     new_title = (data.get("title") or row["title"] or "").strip() or None
+    raw_search = data.get("search_enabled")
+    if raw_search is None:
+        raw_search = data.get("searchEnabled")
+    new_search_enabled = _coerce_bool(raw_search) if raw_search is not None else bool(row["search_enabled"])
 
     if not new_keyword or not new_url:
         return {"error": "keyword and url are required"}, 400  # pragma: no cover
@@ -88,14 +121,22 @@ def update_link(keyword: str):
 
     try:
         db.execute(
-            "UPDATE links SET keyword=?, url=?, title=? WHERE id=?",
-            (new_keyword, new_url, new_title, row["id"]),
+            "UPDATE links SET keyword=?, url=?, title=?, search_enabled=? WHERE id=?",
+            (new_keyword, new_url, new_title, int(new_search_enabled), row["id"]),
         )
         db.commit()
     except sqlite3.IntegrityError:
         return {"error": f"keyword '{new_keyword}' already exists"}, 400
 
-    return {"ok": True, "link": {"keyword": new_keyword, "title": new_title, "url": new_url}}
+    return {
+        "ok": True,
+        "link": {
+            "keyword": new_keyword,
+            "title": new_title,
+            "url": new_url,
+            "search_enabled": new_search_enabled,
+        },
+    }
 
 
 @api_bp.route("/links/<keyword>", methods=["DELETE"])

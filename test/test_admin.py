@@ -68,8 +68,9 @@ def test_admin_link_add_edit_delete(client, db_conn):
     rv = client.post("/admin/add", data=data)
     assert rv.status_code == 302
 
-    row = db_conn.execute("SELECT title FROM links WHERE keyword='gh'").fetchone()
+    row = db_conn.execute("SELECT title, search_enabled FROM links WHERE keyword='gh'").fetchone()
     assert row["title"] == "GitHub"
+    assert row["search_enabled"] == 0
 
     rv = client.post(
         "/admin/update",
@@ -78,15 +79,30 @@ def test_admin_link_add_edit_delete(client, db_conn):
             "keyword": "git",
             "url": "https://github.com/home",
             "title": "Hub",
+            "search_enabled": "on",
         },
     )
     assert rv.status_code == 302
-    row = db_conn.execute("SELECT url FROM links WHERE keyword='git'").fetchone()
+    row = db_conn.execute("SELECT url, search_enabled FROM links WHERE keyword='git'").fetchone()
     assert row["url"] == "https://github.com/home"
+    assert row["search_enabled"] == 1
 
     rv = client.post("/admin/delete", data={"keyword": "git"})
     assert rv.status_code == 302
     assert db_conn.execute("SELECT count(*) AS c FROM links").fetchone()["c"] == 0
+
+
+def test_admin_add_sets_search_flag(client, db_conn):
+    data = {
+        "keyword": "ddg",
+        "url": "https://duckduckgo.com",
+        "title": "DuckDuckGo",
+        "search_enabled": "on",
+    }
+    rv = client.post("/admin/add", data=data)
+    assert rv.status_code == 302
+    row = db_conn.execute("SELECT search_enabled FROM links WHERE keyword='ddg'").fetchone()
+    assert row["search_enabled"] == 1
 
 
 def test_admin_add_validation_and_duplicate(client, db_conn):

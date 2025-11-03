@@ -62,11 +62,26 @@ def init_db():
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           keyword TEXT NOT NULL UNIQUE,
           url TEXT NOT NULL,
-          title TEXT
+          title TEXT,
+          search_enabled INTEGER NOT NULL DEFAULT 0
         );
         """
     )
     db.commit()
+    ensure_search_flag_column(db)
+
+
+def ensure_search_flag_column(db):
+    """Ensure the `search_enabled` column exists on the links table."""
+    cols = set()
+    for row in db.execute("PRAGMA table_info(links)"):
+        if hasattr(row, "keys"):
+            cols.add(row["name"])
+        else:  # pragma: no cover -- fallback when row_factory not set
+            cols.add(row[1])
+    if "search_enabled" not in cols:
+        db.execute("ALTER TABLE links ADD COLUMN search_enabled INTEGER NOT NULL DEFAULT 0")
+        db.commit()
 
 
 def ensure_lists_schema(db):

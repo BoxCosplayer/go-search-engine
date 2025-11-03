@@ -180,6 +180,18 @@
       margin-top: .75rem
     }
 
+    label.checkbox {
+      display: inline-flex;
+      align-items: center;
+      gap: .5rem;
+      justify-content: center;
+    }
+
+    label.checkbox input[type="checkbox"] {
+      width: auto;
+      margin: 0;
+    }
+
     input,
     button {
       font-size: 1rem;
@@ -323,6 +335,12 @@
       display: none !important
     }
 
+    .search-flag {
+      text-align: center;
+      font-weight: 600;
+      letter-spacing: .05em;
+    }
+
     .chip {
       display: inline-block;
       padding: .15rem .45rem;
@@ -391,7 +409,8 @@
 
     /* Dynamic column sizing */
     .col-key,
-    .col-actions {
+    .col-actions,
+    .col-search {
       width: 1%
     }
 
@@ -461,6 +480,10 @@
         <label>URL
           <input name="url" required value="{{ edit_row['url'] }}">
         </label>
+        <label class="checkbox">
+          <input type="checkbox" name="search_enabled" {% if edit_row['search_enabled'] %}checked{% endif %}>
+          Enable !keyword search
+        </label>
         <button type="submit">Save changes</button>
         <p class="meta"><a href="/admin">Cancel</a></p>
       </form>
@@ -475,6 +498,10 @@
         </label>
         <label>URL
           <input name="url" required placeholder="https://github.com">
+        </label>
+        <label class="checkbox">
+          <input type="checkbox" name="search_enabled">
+          Enable !keyword search
         </label>
         <button type="submit">Save</button>
       </form>
@@ -507,6 +534,7 @@
         <col class="col-key">
         <col class="col-title">
         <col class="col-url">
+        <col class="col-search">
         <col class="col-lists">
         <col class="col-actions">
       </colgroup>
@@ -516,16 +544,19 @@
           <th>Keyword</th>
           <th>Title</th>
           <th>URL</th>
+          <th>Search</th>
           <th>Lists</th>
           <th></th>
         </tr>
       </thead>
       <tbody id="linksBody">
         {% for row in rows %}
-        <tr data-keyword="{{row['keyword']}}" data-title="{{row['title'] or ''}}" data-url="{{row['url']}}">
+        <tr data-keyword="{{row['keyword']}}" data-title="{{row['title'] or ''}}" data-url="{{row['url']}}"
+          data-search="{{ '1' if row['search_enabled'] else '0' }}">
           <td><code>{{row['keyword']}}</code></td>
           <td>{{row['title'] or ''}}</td>
           <td><a href="{{row['url']}}">{{row['url']}}</a></td>
+          <td class="search-flag">{{ '✓' if row['search_enabled'] else '—' }}</td>
           <td>
             <div class="lists-edit">
               <form action="/admin/set-lists" method="post">
@@ -557,7 +588,7 @@
         </tr>
         {% endfor %}
         <tr id="noRows" class="hidden">
-          <td colspan="5" class="muted">No matches.</td>
+          <td colspan="6" class="muted">No matches.</td>
         </tr>
       </tbody>
     </table>
@@ -588,7 +619,12 @@
         const q = norm(input.value.trim());
         let shown = 0;
         for (const tr of rows) {
-          const hay = (tr.dataset.keyword + ' ' + (tr.dataset.title || '') + ' ' + tr.dataset.url).toLowerCase();
+          const hay = (
+            tr.dataset.keyword + ' ' +
+            (tr.dataset.title || '') + ' ' +
+            tr.dataset.url + ' ' +
+            (tr.dataset.search || '')
+          ).toLowerCase();
           const show = !q || hay.includes(q);
           tr.classList.toggle('hidden', !show);
           if (show) shown++;

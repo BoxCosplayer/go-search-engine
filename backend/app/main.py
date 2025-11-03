@@ -2,17 +2,33 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sqlite3
 import sys
 import threading
 import webbrowser
-from urllib.parse import quote_plus
+import xml.etree.ElementTree as ET
+from functools import lru_cache
+from html.parser import HTMLParser
+from urllib.parse import quote_plus, urljoin, urlparse
+
+import httpx
+
+try:  # pragma: no cover
+    from curl_cffi import requests as curl_requests  # type: ignore
+except Exception:  # pragma: no cover
+    curl_requests = None  # type: ignore
+
+try:  # pragma: no cover
+    import tls_client
+except Exception:  # pragma: no cover
+    tls_client = None  # type: ignore
 
 from flask import Flask, Response, abort, redirect, render_template, request, url_for
 
 from .admin import admin_bp
 from .api import api_bp
-from .db import DB_PATH, ensure_lists_schema, get_db
+from .db import DB_PATH, ensure_lists_schema, ensure_search_flag_column, get_db
 from .db import init_app as db_init_app
 from .lists import lists_bp
 from .utils import (
@@ -45,6 +61,134 @@ PORT = config.port
 DEBUG = config.debug
 FALLBACK_URL_TEMPLATE = config.fallback_url  # e.g. "https://duckduckgo.com/?q={q}"
 ALLOW_FILES = config.allow_files
+
+OPENSEARCH_TIMEOUT = 5
+OPENSEARCH_USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/118.0 Safari/537.36 go-search-engine/0.4"
+)
+_OPTIONAL_PLACEHOLDER_RE = re.compile(r"\{[^}]+\?\}")
+DEFAULT_HTTP_HEADERS = {
+    "User-Agent": OPENSEARCH_USER_AGENT,
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Upgrade-Insecure-Requests": "1",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-User": "?1",
+    "Sec-Fetch-Dest": "document",
+    "sec-ch-ua": '"Not/A)Brand";v="8", "Chromium";v="118", "Google Chrome";v="118"',
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": '"Windows"',
+}
+_HTTP_CLIENT = httpx.Client(
+    http2=False,
+    headers=DEFAULT_HTTP_HEADERS,
+    timeout=httpx.Timeout(OPENSEARCH_TIMEOUT, connect=OPENSEARCH_TIMEOUT),
+    follow_redirects=True,
+)
+
+
+class _SearchLinkParser(HTMLParser):
+    """HTML parser that collects OpenSearch link hrefs."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.hrefs: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag.lower() != "link":
+            return
+        attr_map = {name.lower(): value or "" for name, value in attrs}
+        rel = attr_map.get("rel", "")
+        rel_tokens = {token.strip().lower() for token in rel.split()}
+        if "search" not in rel_tokens and "search" not in rel.lower():
+            return
+        type_attr = attr_map.get("type", "")
+        if type_attr and "opensearchdescription+xml" not in type_attr.lower():
+            return
+        href = attr_map.get("href")
+        if href:
+            self.hrefs.append(href)
+
+
+def _parse_opensearch_link_hrefs(html: str) -> list[str]:
+    parser = _SearchLinkParser()
+    parser.feed(html)
+    return parser.hrefs
+
+
+def _parse_opensearch_script_hrefs(html: str) -> list[str]:
+    urls: list[str] = []
+    pattern = re.compile(r'opensearchurl[^"]*"([^"]+)"', re.IGNORECASE)
+    for match in pattern.findall(html):
+        unescaped = match.replace("\\/", "/")
+        urls.append(unescaped)
+    return urls
+
+
+@lru_cache(maxsize=128)
+def _fetch_html(url: str) -> str | None:
+    resp = _http_get(url)
+    if resp is None:
+        return None
+    encoding = resp.encoding or "utf-8"
+    return resp.content.decode(encoding, errors="replace")
+
+
+def _http_get(url: str) -> httpx.Response | None:
+    resp: httpx.Response | None = None
+    try:
+        candidate = _HTTP_CLIENT.get(url)
+        if candidate.status_code < 400:
+            return candidate
+    except Exception:  # pragma: no cover - network failure fallback
+        candidate = None
+    if curl_requests is not None:
+        try:
+            alt = curl_requests.get(
+                url,
+                impersonate="chrome120",
+                timeout=OPENSEARCH_TIMEOUT,
+                allow_redirects=True,
+            )
+            if alt.status_code < 400:
+                return _CurlResponseAdapter(alt)
+        except Exception:  # pragma: no cover - optional dependency failure
+            pass
+    if tls_client is not None:
+        try:
+            session = tls_client.Session(client_identifier="chrome120")
+            alt = session.get(
+                url,
+                headers=DEFAULT_HTTP_HEADERS,
+                timeout=OPENSEARCH_TIMEOUT,
+                allow_redirects=True,
+            )
+            if alt.status_code < 400:
+                return _TlsClientResponseAdapter(alt)
+        except Exception:  # pragma: no cover - optional dependency failure
+            pass
+    return resp
+
+
+class _CurlResponseAdapter:
+    """Adapter so curl_cffi responses act like httpx responses."""
+
+    def __init__(self, resp):
+        self.status_code = resp.status_code
+        self.content = resp.content
+        self.encoding = resp.encoding
+
+
+class _TlsClientResponseAdapter:
+    """Adapter so tls-client responses act like httpx responses."""
+
+    def __init__(self, resp):
+        self.status_code = resp.status_code
+        self.content = resp.content
+        self.encoding = resp.encoding or "utf-8"
 
 
 def _require_pillow_modules():
@@ -170,6 +314,167 @@ def _search_suggestions(db, term: str):
     return [dict(row) for row in rows]
 
 
+def _redirect_to_url(url: str):
+    if url.startswith(("http://", "https://")):
+        return redirect(url, code=302)
+
+    if url.startswith("file://"):
+        try:
+            path = file_url_to_path(url)
+        except Exception as e:
+            return (f"Bad file URL: {e}", 400)
+
+        if request.host.split(":")[0] not in ("127.0.0.1", "localhost") and not ALLOW_FILES:
+            return (
+                "Refusing to open local files over non-localhost. Bind to 127.0.0.1 or set ALLOW_FILES.",
+                403,
+            )
+
+        if not is_allowed_path(path):
+            return ("Path not allowed. Set ALLOW_FILES to include this directory.", 403)
+
+        if not os.path.exists(path):
+            return (f"File/folder not found: {path}", 404)
+
+        try:
+            open_path_with_os(path)
+        except Exception as e:
+            return (f"Failed to open: {e}", 500)
+
+        return render_template("file_open.html", path=path), 200
+
+    return redirect(url, code=302)
+
+
+def _opensearch_document_url(link_url: str) -> str | None:
+    parsed = urlparse(link_url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return None
+    if parsed.path.lower().endswith(".xml"):
+        return link_url
+    base = f"{parsed.scheme}://{parsed.netloc}/"
+    return urljoin(base, "opensearch.xml")
+
+
+def _candidate_opensearch_document_urls(link_url: str) -> list[str]:
+    parsed = urlparse(link_url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return []
+    base = f"{parsed.scheme}://{parsed.netloc}"
+    docs: list[str] = []
+    seen: set[str] = set()
+
+    def add(url: str | None) -> None:
+        if url and url not in seen:
+            seen.add(url)
+            docs.append(url)
+
+    add(_opensearch_document_url(link_url))
+    add(urljoin(link_url, "opensearch.xml"))
+    add(urljoin(base + "/", "opensearch.xml"))
+    add(urljoin(base + "/", ".well-known/opensearch.xml"))
+
+    html_sources = {link_url, base + "/"}
+    for html_url in html_sources:
+        html = _fetch_html(html_url)
+        if not html:
+            continue
+        for href in _parse_opensearch_link_hrefs(html):
+            add(urljoin(html_url, href))
+        for href in _parse_opensearch_script_hrefs(html):
+            add(urljoin(html_url, href))
+    return docs
+
+
+def _download_opensearch_document(doc_url: str) -> str:
+    resp = _http_get(doc_url)
+    if resp is None:  # pragma: no cover - network failure fallback
+        raise RuntimeError("failed to download OpenSearch descriptor")
+    encoding = resp.encoding or "utf-8"
+    return resp.content.decode(encoding, errors="replace")
+
+
+def _extract_search_template(xml_text: str) -> str | None:
+    try:
+        root = ET.fromstring(xml_text)
+    except ET.ParseError:
+        return None
+    for url_el in root.findall(".//{*}Url"):
+        template = url_el.attrib.get("template")
+        if not template:
+            continue
+        method = url_el.attrib.get("method", "get").lower()
+        if method != "get":
+            continue
+        mime = url_el.attrib.get("type", "text/html").lower()
+        if mime not in {"text/html", "application/xhtml+xml"}:
+            continue
+        if "searchterms" not in template.lower():
+            continue
+        return template
+    return None
+
+
+@lru_cache(maxsize=128)
+def _get_opensearch_template(doc_url: str) -> str | None:
+    try:
+        xml_text = _download_opensearch_document(doc_url)
+    except Exception:
+        return None
+    return _extract_search_template(xml_text)
+
+
+def _build_search_url(doc_url: str, template: str, terms: str) -> str | None:
+    encoded = quote_plus(terms)
+    replaced = False
+    for placeholder in ("{searchTerms}", "{searchTerms?}", "{searchterms}", "{searchterms?}"):
+        if placeholder in template:
+            template = template.replace(placeholder, encoded)
+            replaced = True
+    if not replaced:
+        return None
+    template = _OPTIONAL_PLACEHOLDER_RE.sub("", template)
+    return urljoin(doc_url, template)
+
+
+def _lookup_opensearch_search_url(link_url: str, terms: str) -> str | None:
+    if not terms:
+        return None
+    for doc_url in _candidate_opensearch_document_urls(link_url):
+        template = _get_opensearch_template(doc_url)
+        if not template:
+            continue
+        search_url = _build_search_url(doc_url, template, terms)
+        if search_url:
+            return search_url
+    return None
+
+
+def _handle_bang_query(db, query: str):
+    if not query.startswith("!"):
+        return None
+    remainder = query[1:].strip()
+    if not remainder:
+        return None
+    parts = remainder.split(maxsplit=1)
+    keyword = parts[0]
+    search_terms = parts[1] if len(parts) > 1 else ""
+    if not keyword:  # pragma: no cover - defensive guard
+        return None
+    row = db.execute(
+        "SELECT url, search_enabled FROM links WHERE lower(keyword)=lower(?)",
+        (keyword,),
+    ).fetchone()
+    if not row:
+        return None
+    if not row["search_enabled"] or not search_terms:
+        return _redirect_to_url(row["url"])
+    search_url = _lookup_opensearch_search_url(row["url"], search_terms)
+    if not search_url:
+        return _redirect_to_url(row["url"])
+    return _redirect_to_url(search_url)
+
+
 @app.route("/healthz")
 def healthz():
     """Lightweight health check endpoint.
@@ -200,7 +505,7 @@ def index():
     ensure_lists_schema(db)
     # If you have the lists schema, this will include list slugs per link.
     rows = db.execute("""
-        SELECT l.keyword, l.title, l.url,
+        SELECT l.keyword, l.title, l.url, l.search_enabled,
                IFNULL(GROUP_CONCAT(li.slug, ', '), '') AS lists_csv
         FROM links l
         LEFT JOIN link_lists ll ON ll.link_id = l.id
@@ -226,6 +531,10 @@ def go():
         abort(400, "Missing q")
 
     db = get_db()
+    bang_response = _handle_bang_query(db, q)
+    if bang_response is not None:
+        return bang_response
+
     if any(ch.isspace() for ch in q):
         suggestions = _search_suggestions(db, q)
         fallback_url = ""
@@ -239,39 +548,7 @@ def go():
     exact = db.execute("SELECT url FROM links WHERE lower(keyword) = lower(?)", (q,)).fetchone()
 
     if exact:
-        url = exact["url"]
-
-        if url.startswith(("http://", "https://")):
-            return redirect(url, code=302)
-
-        if url.startswith("file://"):
-            try:
-                path = file_url_to_path(url)
-            except Exception as e:
-                return (f"Bad file URL: {e}", 400)
-
-            # Safety: only allow local opens (keep server bound to 127.0.0.1) and/or allowlist
-            if request.host.split(":")[0] not in ("127.0.0.1", "localhost") and not ALLOW_FILES:
-                return (
-                    "Refusing to open local files over non-localhost. Bind to 127.0.0.1 or set ALLOW_FILES.",
-                    403,
-                )
-
-            if not is_allowed_path(path):
-                return ("Path not allowed. Set ALLOW_FILES to include this directory.", 403)
-
-            if not (os.path.exists(path)):
-                return (f"File/folder not found: {path}", 404)
-
-            try:
-                open_path_with_os(path)
-            except Exception as e:
-                return (f"Failed to open: {e}", 500)
-
-            # Show a tiny confirmation page (no redirect to file://)
-            return render_template("file_open.html", path=path), 200
-
-        return redirect(url, code=302)
+        return _redirect_to_url(exact["url"])
 
     # Collect suggestions (prefix/substring matches on keyword/title/url)
     suggestions = _search_suggestions(db, q)
@@ -331,10 +608,12 @@ if __name__ == "__main__":  # pragma: no cover
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           keyword TEXT NOT NULL UNIQUE,
           url TEXT NOT NULL,
-          title TEXT
+          title TEXT,
+          search_enabled INTEGER NOT NULL DEFAULT 0
         );
         """)
         db.commit()
+        ensure_search_flag_column(db)
 
     def _run_server():
         """Run the Flask development server (no reloader)."""

@@ -15,6 +15,8 @@ def test_ensure_schema_creates_links_table(tmp_path):
     init_db.ensure_schema(conn)
     row = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='links'").fetchone()
     assert row[0] == "links"
+    columns = {info[1] for info in conn.execute("PRAGMA table_info(links)")}
+    assert "search_enabled" in columns
     conn.close()
 
 
@@ -56,6 +58,10 @@ def test_main_initializes_database(tmp_path, monkeypatch):
     init_db.main()
     assert db_file.exists()
     assert captured[0][0] == "links.csv"
+    conn = sqlite3.connect(db_file)
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(links)")}
+    assert "search_enabled" in cols
+    conn.close()
 
 
 def test_init_db_import_fallback(monkeypatch, tmp_path):
@@ -69,7 +75,20 @@ def test_init_db_import_fallback(monkeypatch, tmp_path):
     monkeypatch.setattr(builtins, "__import__", fake_import)
     module = importlib.reload(init_db)
     conn = sqlite3.connect(tmp_path / "db.sqlite")
+    module.ensure_schema(conn)
     module.ensure_lists_schema(conn)
+    conn.execute("DROP TABLE IF EXISTS links")
+    conn.execute(
+        """
+        CREATE TABLE links (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          keyword TEXT NOT NULL,
+          url TEXT NOT NULL,
+          title TEXT
+        );
+        """
+    )
+    module.ensure_search_flag_column(conn)
     importlib.reload(init_db)
 
 

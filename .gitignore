@@ -73,6 +73,7 @@ desktop.ini
 ########################################
 **/data/
 *.db
+*.sqlite
 
 ########################################
 # PyInstaller output (keep .spec tracked)

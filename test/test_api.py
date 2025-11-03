@@ -5,7 +5,12 @@ def test_links_endpoint_lists_existing(client):
 
 
 def test_links_post_and_get(client, db_conn):
-    payload = {"keyword": "gh", "url": "https://github.com", "title": "GitHub"}
+    payload = {
+        "keyword": "gh",
+        "url": "https://github.com",
+        "title": "GitHub",
+        "search_enabled": True,
+    }
     rv = client.post("/api/links", json=payload)
     assert rv.status_code == 200
     assert rv.get_json() == {"ok": True}
@@ -13,6 +18,23 @@ def test_links_post_and_get(client, db_conn):
     rv = client.get("/api/links")
     data = rv.get_json()
     assert data["links"][0]["keyword"] == "gh"
+    assert data["links"][0]["search_enabled"] is True
+
+
+def test_links_post_defaults_search_disabled(client):
+    payload = {"keyword": "ddg", "url": "https://duckduckgo.com"}
+    rv = client.post("/api/links", json=payload)
+    assert rv.status_code == 200
+    rv = client.get("/api/links/ddg")
+    assert rv.get_json()["link"]["search_enabled"] is False
+
+
+def test_links_post_accepts_string_flag(client, db_conn):
+    payload = {"keyword": "yt", "url": "https://youtube.com", "search_enabled": "yes"}
+    rv = client.post("/api/links", json=payload)
+    assert rv.status_code == 200
+    row = db_conn.execute("SELECT search_enabled FROM links WHERE keyword='yt'").fetchone()
+    assert row["search_enabled"] == 1
 
 
 def test_links_post_validation_errors(client):
@@ -37,16 +59,25 @@ def test_get_link_and_update_and_delete(client):
     rv = client.get("/api/links/gh")
     assert rv.status_code == 200
     assert rv.get_json()["link"]["url"] == "https://github.com"
+    assert rv.get_json()["link"]["search_enabled"] is False
 
     rv = client.put(
         "/api/links/gh",
-        json={"url": "https://github.com/home", "title": "Hub", "keyword": "git"},
+        json={
+            "url": "https://github.com/home",
+            "title": "Hub",
+            "keyword": "git",
+            "search_enabled": 1,
+        },
     )
     assert rv.status_code == 200
-    assert rv.get_json()["link"]["keyword"] == "git"
+    body = rv.get_json()["link"]
+    assert body["keyword"] == "git"
+    assert body["search_enabled"] is True
 
     rv = client.get("/api/links/git")
     assert rv.status_code == 200
+    assert rv.get_json()["link"]["search_enabled"] is True
 
     rv = client.get("/api/links/missing")
     assert rv.status_code == 404

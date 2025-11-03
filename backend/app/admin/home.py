@@ -11,7 +11,7 @@ def admin_home():
     ensure_lists_schema(db)
     rows = db.execute(
         """
-        SELECT l.id, l.keyword, l.title, l.url,
+        SELECT l.id, l.keyword, l.title, l.url, l.search_enabled,
                IFNULL(GROUP_CONCAT(li.slug, ', '), '') AS lists_csv
         FROM links l
         LEFT JOIN link_lists ll ON ll.link_id = l.id
@@ -25,7 +25,7 @@ def admin_home():
     edit_row = None
     if edit_key:
         edit_row = db.execute(
-            "SELECT keyword, title, url FROM links WHERE lower(keyword)=lower(?)",
+            "SELECT keyword, title, url, search_enabled FROM links WHERE lower(keyword)=lower(?)",
             (edit_key,),
         ).fetchone()
 

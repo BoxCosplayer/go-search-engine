@@ -15,7 +15,7 @@ import sys
 
 # Use the same default DB location as the app
 try:
-    from backend.app.db import DB_PATH, ensure_lists_schema  # type: ignore
+    from backend.app.db import DB_PATH, ensure_lists_schema, ensure_search_flag_column  # type: ignore
 except Exception:
     # Fallback to repo-local data folder
     DB_PATH = os.environ.get(
@@ -42,6 +42,12 @@ except Exception:
         """)
         conn.commit()
 
+    def ensure_search_flag_column(conn):
+        cols = {row[1] for row in conn.execute("PRAGMA table_info(links)")}
+        if "search_enabled" not in cols:
+            conn.execute("ALTER TABLE links ADD COLUMN search_enabled INTEGER NOT NULL DEFAULT 0")
+            conn.commit()
+
 
 def ensure_schema(conn):
     """Create the core `links` table if it does not exist.
@@ -57,10 +63,12 @@ def ensure_schema(conn):
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       keyword TEXT NOT NULL UNIQUE,
       url TEXT NOT NULL,
-      title TEXT
+      title TEXT,
+      search_enabled INTEGER NOT NULL DEFAULT 0
     );
     """)
     conn.commit()
+    ensure_search_flag_column(conn)
 
 
 def import_csv(conn, path):
@@ -104,6 +112,7 @@ def main():
         ensure_schema(conn)
         # Also ensure lists schema so admin/lists UIs work out-of-the-box
         ensure_lists_schema(conn)
+        ensure_search_flag_column(conn)
 
         if len(sys.argv) >= 2:
             csv_path = sys.argv[1]

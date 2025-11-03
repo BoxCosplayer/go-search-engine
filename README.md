@@ -1,17 +1,18 @@
-# go -- local shortcuts server
+﻿# go -- local shortcuts server
 
 This local Flask app lets you type `go <keyword>` in your browser's address bar and jump straight to a stored URL. It uses Flask blueprints, Jinja templates, and an SQLite database behind a tiny admin UI.
 
 ## Features
 - Keyword driven redirects with substring suggestions and an optional fallback search link
 - Browser OpenSearch provider for one-click omnibox integration
+- Optional search bangs: mark a shortcut as searchable and use `go !keyword {terms}` to hand the query to the site's OpenSearch template.
 - Optional local file launches guarded by an allow list of directories
 - Browser admin UI for links, lists, and runtime config (no authentication; intended for localhost)
 - JSON API surface for scripting link and list management
 - Optional system tray icon plus a PyInstaller spec for packaging a desktop helper
 
 ## Current TODOs:
-- 1.0 polish: add a search flag, lock the homepage keyword, finish API CRUD endpoints, complete README dev-install and feature docs, embed run-on-start, prepare EXE releases, wire up OpenSearch, add pytest scaffolding, and split admin/api link handlers.
+- 1.0 polish: lock the homepage keyword, finish API CRUD endpoints, complete README dev-install and feature docs, embed run-on-start, prepare EXE releases, wire up OpenSearch, add pytest scaffolding, and split admin/api link handlers.
 - Docs & agents: create `agents.md` and restructure the top-level documentation.
 - 2.0 roadmap: add admin/API authentication, separate admin flows, introduce rate limiting, harden DB usage, provide Docker packaging, and pursue performance improvements.
 - 3.0 exploration: consider a Rust rewrite, expand official Linux/macOS support, and develop an enterprise-ready release.
@@ -20,12 +21,24 @@ This local Flask app lets you type `go <keyword>` in your browser's address bar 
 - Shortcuts live in SQLite at `backend/app/data/links.db` by default (configurable).
 - Configure a browser search engine keyword such as `go` that points to `http://127.0.0.1:5000/go?q=%s`.
 - Exact keyword matches issue a 302 redirect. Non matches show suggestions.
+- Prefix a shortcut with `!` (for example `go !gh issues`) when its search flag is enabled to run the site's OpenSearch query. Without the flag the request falls back to the shortcut's default target.
 - Fallback searches come from the configured `fallback-url` string (for example DuckDuckGo or Google).
 - File shortcuts (`file://...`) only open when `allow-files` is true and the target path is inside the configured `file-allow` directories.
 - Runtime settings are loaded from `config.json` (generated from `config-template.txt` on first run).
 
 ## Browser OpenSearch integration
-- The app advertises `/opensearch.xml`, so supporting browsers (Firefox, some Chromium forks) surface an “Add go” button automatically. Accept it to map the omnibox keyword to the server.
+### Search bangs, OpenSearch, and hostile endpoints
+
+Turning on the `search_enabled` flag for a shortcut lets you run `go !keyword cats` and have the server inspect the target site’s OpenSearch descriptor. This works great for sites that expose `/opensearch.xml` or `<link rel="search">` without additional challenges (e.g., GitHub, Wikipedia, internal Confluence).
+
+A few public sites actively block automated fetches (notably stackoverflow.com and other Cloudflare-backed properties). When the descriptor can’t be retrieved, the bang falls back to the stored URL, which usually lands you on the home page. For those “hostile” endpoints, create the shortcut with an explicit search template instead: `https://stackoverflow.com/search?q={q}`. Leave the bang flag on, and the server will just substitute `{q}` without trying to fetch OpenSearch.
+
+### Search bangs, OpenSearch, and hostile endpoints
+
+Turning on the `search_enabled` flag for a shortcut lets you run `go !keyword cats` and have the server inspect the target site’s OpenSearch descriptor. This works great for sites that expose `/opensearch.xml` or `<link rel="search">` without additional challenges (e.g., GitHub, Wikipedia, internal Confluence).
+
+A few public sites actively block automated fetches (notably stackoverflow.com and other Cloudflare-backed properties). When the descriptor can’t be retrieved, the bang falls back to the stored URL, which usually lands you on the home page. For those “hostile” endpoints, create the shortcut with an explicit search template instead: `https://stackoverflow.com/search?q={q}`. Leave the bang flag on, and the server will just substitute `{q}` without trying to fetch OpenSearch.
+- The app advertises `/opensearch.xml`, so supporting browsers (Firefox, some Chromium forks) surface an â€œAdd goâ€ button automatically. Accept it to map the omnibox keyword to the server.
 - Chrome/Edge still allow manual configuration: add a custom search engine pointing to `http://127.0.0.1:5000/go?q=%s` with keyword `go`.
 - The optional `/opensearch/suggest` endpoint returns live completions for browsers that request OpenSearch suggestions (currently Firefox), backed by the same substring matching used on the not-found page.
 
@@ -144,7 +157,7 @@ The script creates the base schema plus list tables so the admin UI works immedi
 ## API endpoints
 
 - `GET /api/links` -- list all links.
-- `POST /api/links` -- add a link (`{"keyword":"gh","url":"https://github.com","title":"GitHub"}`).
+- `POST /api/links` -- add a link (`{"keyword":"gh","url":"https://github.com","title":"GitHub","search_enabled":true}`; the last flag is optional and defaults to `false`).
 - `GET /api/links/<keyword>` -- fetch a single link by keyword (case-insensitive).
 - `PUT /api/links/<keyword>` -- update keyword/title/url for an existing link.
 - `DELETE /api/links/<keyword>` -- remove a link.
@@ -211,3 +224,4 @@ MIT. See `LICENSE` for details.
 2. **Automation / agents**
    - Start by reading `agents.md`; it spells out the structure, testing expectations, and safe-edit guidelines tailored to this repo.
    - When scripting edits, reuse the helper functions already in the blueprint modules and respect the re-export patterns described there.
+

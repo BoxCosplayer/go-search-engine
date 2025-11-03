@@ -159,6 +159,12 @@
       font-size: .9rem;
     }
 
+    .se {
+      font-weight: 600;
+      text-align: center;
+      letter-spacing: .05em;
+    }
+
     .muted {
       color: var(--muted)
     }
@@ -194,16 +200,18 @@
           <th>Keyword</th>
           <th>Title</th>
           <th>URL</th>
+          <th>Search</th>
           <th>Lists</th>
         </tr>
       </thead>
       <tbody id="linksBody">
         {% for row in rows %}
         <tr data-keyword="{{ row['keyword'] }}" data-title="{{ (row['title'] or '') }}" data-url="{{ row['url'] }}"
-          data-lists="{{ (row['lists_csv'] or '') }}">
+          data-lists="{{ (row['lists_csv'] or '') }}" data-search="{{ 'yes' if row['search_enabled'] else 'no' }}">
           <td class="kw"><code>{{row['keyword']}}</code></td>
           <td class="ti">{{row['title'] or ''}}</td>
           <td class="ur"><a href="{{row['url']}}">{{row['url']}}</a></td>
+          <td class="se">{{ '✓' if row['search_enabled'] else '—' }}</td>
           <td class="li">
             {% if row['lists_csv'] %}
             {% for s in row['lists_csv'].split(',') %}
@@ -217,7 +225,7 @@
         </tr>
         {% endfor %}
         <tr id="noRows" class="hidden">
-          <td colspan="4" class="muted">No matches.</td>
+          <td colspan="5" class="muted">No matches.</td>
         </tr>
       </tbody>
     </table>
@@ -243,7 +251,8 @@
             (tr.dataset.keyword || '') + ' ' +
             (tr.dataset.title || '') + ' ' +
             (tr.dataset.url || '') + ' ' +
-            (tr.dataset.lists || '')
+            (tr.dataset.lists || '') + ' ' +
+            (tr.dataset.search || '')
           ).toLowerCase();
           const show = !q || hay.includes(q);
           tr.classList.toggle('hidden', !show);

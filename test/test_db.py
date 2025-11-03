@@ -1,4 +1,6 @@
-from backend.app.db import close_db, ensure_lists_schema, get_db, init_db
+import sqlite3
+
+from backend.app.db import close_db, ensure_lists_schema, ensure_search_flag_column, get_db, init_db
 
 
 def test_get_db_reuses_connection(app_ctx):
@@ -13,7 +15,29 @@ def test_init_db_creates_links_table(app_ctx):
     conn = get_db()
     row = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='links'").fetchone()
     assert row["name"] == "links"
+    cols = {info["name"] for info in conn.execute("PRAGMA table_info(links)").fetchall()}
+    assert "search_enabled" in cols
     close_db(None)
+
+
+def test_ensure_search_flag_column_adds_missing_column(tmp_path):
+    db_file = tmp_path / "legacy.sqlite"
+    conn = sqlite3.connect(db_file)
+    conn.execute(
+        """
+        CREATE TABLE links (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          keyword TEXT NOT NULL UNIQUE,
+          url TEXT NOT NULL,
+          title TEXT
+        );
+        """
+    )
+    conn.commit()
+    ensure_search_flag_column(conn)
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(links)")}
+    assert "search_enabled" in columns
+    conn.close()
 
 
 def test_ensure_lists_schema_creates_tables(app_ctx):
