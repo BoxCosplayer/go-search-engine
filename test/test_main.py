@@ -1,3 +1,4 @@
+import json
 import os
 from pathlib import Path
 from urllib.parse import urlparse
@@ -103,6 +104,22 @@ def test_go_not_found_renders_suggestions(client, db_conn):
     assert b"https://search.example/" in rv.data
 
 
+def test_index_includes_opensearch_link(client):
+    rv = client.get("/")
+    assert rv.status_code == 200
+    text = rv.get_data(as_text=True)
+    assert 'rel="search"' in text
+    assert "opensearch.xml" in text
+
+
+def test_admin_includes_opensearch_link(client):
+    rv = client.get("/admin/")
+    assert rv.status_code == 200
+    text = rv.get_data(as_text=True)
+    assert 'rel="search"' in text
+    assert "opensearch.xml" in text
+
+
 def test_make_tray_image_returns_image():
     img = main._make_tray_image()
     assert img.size == (64, 64)
@@ -158,6 +175,34 @@ def test_load_config_missing_file(monkeypatch, tmp_path):
     cfg = tmp_path / "missing.json"
     monkeypatch.setenv("GO_CONFIG_PATH", str(cfg))
     assert main.load_config() == {}
+
+
+def test_opensearch_description(client):
+    rv = client.get("/opensearch.xml")
+    assert rv.status_code == 200
+    assert rv.mimetype == "application/opensearchdescription+xml"
+    text = rv.get_data(as_text=True)
+    assert 'template="http://localhost/go?q={searchTerms}"' in text
+    assert 'template="http://localhost/opensearch/suggest?q={searchTerms}"' in text
+
+
+def test_opensearch_suggest_returns_matches(client, db_conn):
+    add_link(db_conn, "gh", "https://github.com", "GitHub")
+    rv = client.get("/opensearch/suggest", query_string={"q": "g"})
+    assert rv.status_code == 200
+    assert rv.mimetype == "application/x-suggestions+json"
+    data = json.loads(rv.data)
+    assert data[0] == "g"
+    assert data[1] == ["gh"]
+    assert data[2][0] == "GitHub"
+    assert data[3][0] == "https://github.com"
+
+
+def test_opensearch_suggest_blank_query(client):
+    rv = client.get("/opensearch/suggest")
+    assert rv.status_code == 200
+    assert rv.mimetype == "application/x-suggestions+json"
+    assert json.loads(rv.data) == ["", [], [], []]
 
 
 def test_load_config_handles_missing_file(tmp_path, monkeypatch):

@@ -5,6 +5,7 @@ This local Flask app lets you type `go <keyword>` in your browser's address bar 
 ## Features
 - Keyword driven redirects with substring suggestions and an optional fallback search link
 - URL templates with `{q}`, `{args}`, `{1}` style placeholders for provider shortcuts
+- Browser OpenSearch provider for one-click omnibox integration
 - Optional local file launches guarded by an allow list of directories
 - Browser admin UI for links, lists, and runtime config (no authentication; intended for localhost)
 - JSON API surface for scripting link and list management
@@ -23,6 +24,11 @@ This local Flask app lets you type `go <keyword>` in your browser's address bar 
 - Fallback searches come from the configured `fallback-url` string (for example DuckDuckGo or Google).
 - File shortcuts (`file://...`) only open when `allow-files` is true and the target path is inside the configured `file-allow` directories.
 - Runtime settings are loaded from `config.json` (generated from `config-template.txt` on first run).
+
+## Browser OpenSearch integration
+- The app advertises `/opensearch.xml`, so supporting browsers (Firefox, some Chromium forks) surface an “Add go” button automatically. Accept it to map the omnibox keyword to the server.
+- Chrome/Edge still allow manual configuration: add a custom search engine pointing to `http://127.0.0.1:5000/go?q=%s` with keyword `go`.
+- The optional `/opensearch/suggest` endpoint returns live completions for browsers that request OpenSearch suggestions (currently Firefox), backed by the same substring matching used on the not-found page.
 
 ## Project layout
 

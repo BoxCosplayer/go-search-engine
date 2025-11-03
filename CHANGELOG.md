@@ -2,6 +2,11 @@
 
 ## [Major Versions Log](#major-versions-log)
 
+## 0.3.4
+
+- Added OpenSearch description/suggestions endpoints and discovery tags
+- Documented browser integration guidance in the README
+
 ## 0.3.3
 
 - Added agents.md in project root

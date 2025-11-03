@@ -1,12 +1,11 @@
 {
-    "host": "0.0.0.0",
-    "port": 6000,
+    "host": "127.0.0.1",
+    "port": 5000,
     "debug": true,
-    "db-path": "db.sqlite",
+    "db-path": "backend/app/data/links.db",
     "allow-files": true,
-    "fallback-url": "https://duck.example/?q={q}",
+    "fallback-url": "https://duckduckgo.com/?q={q}",
     "file-allow": [
-        "/data",
         "/tmp"
     ]
 }

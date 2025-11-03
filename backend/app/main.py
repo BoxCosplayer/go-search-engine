@@ -8,7 +8,7 @@ import threading
 import webbrowser
 from urllib.parse import quote_plus
 
-from flask import Flask, abort, redirect, render_template, request, url_for
+from flask import Flask, Response, abort, redirect, render_template, request, url_for
 
 from .admin import admin_bp
 from .api import api_bp
@@ -154,6 +154,24 @@ app.register_blueprint(admin_bp, url_prefix="/admin")
 app.register_blueprint(lists_bp, url_prefix="/lists")
 
 
+def _search_suggestions(db, term: str):
+    """Return best-effort search suggestions for a query term."""
+    term = (term or "").strip()
+    if not term:
+        return []
+    like = f"%{term}%"
+    rows = db.execute(
+        """
+        SELECT keyword, title, url
+        FROM links
+        WHERE keyword LIKE ? OR (title IS NOT NULL AND title LIKE ?) OR url LIKE ?
+        ORDER BY keyword COLLATE NOCASE LIMIT 10
+        """,
+        (like, like, like),
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
 @app.route("/healthz")
 def healthz():
     """Lightweight health check endpoint.
@@ -271,16 +289,7 @@ def go():
         return ("Unsupported URL scheme", 400)
 
     # Collect suggestions (prefix/substring matches on keyword/title/url)
-    like = f"%{q}%"
-    suggestions = db.execute(
-        """
-        SELECT keyword, title, url
-        FROM links
-        WHERE keyword LIKE ? OR (title IS NOT NULL AND title LIKE ?) OR url LIKE ?
-        ORDER BY keyword COLLATE NOCASE LIMIT 10
-        """,
-        (like, like, like),
-    ).fetchall()
+    suggestions = _search_suggestions(db, q)
 
     fallback_url = ""
     if FALLBACK_URL_TEMPLATE:
@@ -289,6 +298,39 @@ def go():
     return render_template(
         "not_found.html", q=q, suggestions=[dict(x) for x in suggestions], fallback_url=fallback_url
     ), 404
+
+
+@app.route("/opensearch.xml")
+def opensearch_description():
+    """Serve the OpenSearch description document for auto-discovery."""
+    base_url = request.host_url.rstrip("/")
+    search_url = f"{base_url}/go?q={{searchTerms}}"
+    suggest_url = f"{base_url}/opensearch/suggest?q={{searchTerms}}"
+    xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">
+  <ShortName>go</ShortName>
+  <Description>Local shortcuts search</Description>
+  <Url type="text/html" method="get" template="{search_url}"/>
+  <Url type="application/x-suggestions+json" template="{suggest_url}"/>
+  <InputEncoding>UTF-8</InputEncoding>
+  <OutputEncoding>UTF-8</OutputEncoding>
+</OpenSearchDescription>
+"""
+    return Response(xml, mimetype="application/opensearchdescription+xml")
+
+
+@app.route("/opensearch/suggest")
+def opensearch_suggest():
+    """Return OpenSearch-style JSON suggestions for browsers supporting it."""
+    raw_q = request.args.get("q") or ""
+    q = sanitize_query(raw_q)
+    db = get_db()
+    matches = _search_suggestions(db, q)
+    keywords = [item["keyword"] for item in matches]
+    titles = [(item.get("title") or item["keyword"]) for item in matches]
+    urls = [item["url"] for item in matches]
+    payload = json.dumps([q, keywords, titles, urls])
+    return Response(payload, mimetype="application/x-suggestions+json")
 
 
 # ---- Minimal admin UI (no auth, intended for localhost only) ----

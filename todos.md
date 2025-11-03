@@ -11,7 +11,7 @@
 ~~add agents.md and reformat the whole thing~~
 
 Search Flag
-opensearch integration
+~~opensearch integration~~
 
 fully rework readme:
     highlight dev installation
@@ -33,6 +33,6 @@ speed improvements
 
 ## 3.0 features:
 
-rewrite in rust or sum xdd
+rewrite in rust or something
 official linux / macos support
 official enterprise support
