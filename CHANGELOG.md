@@ -2,7 +2,7 @@
 
 ## [Major Versions Log](#major-versions-log)
 
-## 0.3.4
+## 0.4.0
 
 - Added OpenSearch description/suggestions endpoints and discovery tags
 - Documented browser integration guidance in the README
@@ -91,6 +91,7 @@
 
 # Major Versions Log
 
+0.4 - Enhanced Search
 0.3 - Project Modularisation & testing
 0.2 - Config Overhaul + extra admin powers
 0.1 - Initial Project Publication
