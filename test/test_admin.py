@@ -92,6 +92,8 @@ def test_admin_link_add_edit_delete(client, db_conn):
 def test_admin_add_validation_and_duplicate(client, db_conn):
     rv = client.post("/admin/add", data={"keyword": "", "url": ""})
     assert rv.status_code == 400
+    rv = client.post("/admin/add", data={"keyword": "two words", "url": "https://example.com"})
+    assert rv.status_code == 400
 
     client.post("/admin/add", data={"keyword": "gh", "url": "https://github.com"})
     rv = client.post("/admin/add", data={"keyword": "gh", "url": "https://github.com"})
@@ -149,6 +151,15 @@ def test_admin_update_validation_and_errors(client):
         data={
             "original_keyword": "a",
             "keyword": "b",
+            "url": "https://example.com",
+        },
+    )
+    assert rv.status_code == 400
+    rv = client.post(
+        "/admin/update",
+        data={
+            "original_keyword": "a",
+            "keyword": "multi term",
             "url": "https://example.com",
         },
     )

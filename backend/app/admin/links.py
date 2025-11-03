@@ -15,6 +15,8 @@ def admin_add():
 
     if not keyword or not url:
         abort(400, "Keyword and URL required")
+    if any(ch.isspace() for ch in keyword):
+        abort(400, "Keyword cannot contain whitespace")
 
     db = get_db()
     init_db()
@@ -49,6 +51,8 @@ def admin_update():
 
     if not original or not keyword or not url:
         abort(400, "original_keyword, keyword and url are required")
+    if any(ch.isspace() for ch in keyword):
+        abort(400, "Keyword cannot contain whitespace")
 
     db = get_db()
     row = db.execute("SELECT id FROM links WHERE lower(keyword)=lower(?)", (original,)).fetchone()

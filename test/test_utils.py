@@ -7,31 +7,6 @@ import pytest
 from backend.app import utils
 
 
-def test_split_query_parses_keyword_and_words():
-    key, rest, words = utils.split_query("gh issues open")
-    assert key == "gh"
-    assert rest == "issues open"
-    assert words == ["issues", "open"]
-
-
-def test_split_query_handles_empty():
-    assert utils.split_query("   ") == ("", "", [])
-
-
-def test_render_url_template_supports_all_placeholders():
-    url = utils.render_url_template(
-        "https://example/?q={q}&args={args}&raw={args_raw}&enc={args_url}&first={1}",
-        "go cats",
-        "cats",
-        ["cats"],
-    )
-    assert "q=go+cats" in url
-    assert "args=cats" in url
-    assert "raw=cats" in url
-    assert "enc=cats" in url
-    assert "first=cats" in url
-
-
 def test_sanitize_query_normalizes_quotes_and_trailing_chars():
     assert utils.sanitize_query('"Hello?! "') == "Hello"
     assert utils.sanitize_query("' spaced '") == "spaced"

@@ -4,7 +4,6 @@ This local Flask app lets you type `go <keyword>` in your browser's address bar 
 
 ## Features
 - Keyword driven redirects with substring suggestions and an optional fallback search link
-- URL templates with `{q}`, `{args}`, `{1}` style placeholders for provider shortcuts
 - Browser OpenSearch provider for one-click omnibox integration
 - Optional local file launches guarded by an allow list of directories
 - Browser admin UI for links, lists, and runtime config (no authentication; intended for localhost)
@@ -20,7 +19,7 @@ This local Flask app lets you type `go <keyword>` in your browser's address bar 
 ## How it works
 - Shortcuts live in SQLite at `backend/app/data/links.db` by default (configurable).
 - Configure a browser search engine keyword such as `go` that points to `http://127.0.0.1:5000/go?q=%s`.
-- Exact keyword matches issue a 302 redirect; provider style shortcuts expand URL templates; non matches show suggestions.
+- Exact keyword matches issue a 302 redirect. Non matches show suggestions.
 - Fallback searches come from the configured `fallback-url` string (for example DuckDuckGo or Google).
 - File shortcuts (`file://...`) only open when `allow-files` is true and the target path is inside the configured `file-allow` directories.
 - Runtime settings are loaded from `config.json` (generated from `config-template.txt` on first run).

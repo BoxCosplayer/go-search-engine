@@ -1,7 +1,6 @@
 import json
 import os
 from pathlib import Path
-from urllib.parse import urlparse
 
 import pytest
 from backend.app import main
@@ -73,12 +72,17 @@ def test_go_exact_match_redirects(client, db_conn):
     assert rv.headers["Location"] == "https://github.com"
 
 
-def test_go_provider_template_expands(client, db_conn):
+def test_go_multi_term_query_without_exact_match_returns_not_found(client, db_conn):
     add_link(db_conn, "g", "https://example.com/search?q={q}", "Search")
     rv = client.get("/go", query_string={"q": "g cats"})
-    assert rv.status_code == 302
-    parsed = urlparse(rv.headers["Location"])
-    assert parsed.query == "q=g+cats"
+    assert rv.status_code == 404
+    assert b"No exact match" in rv.data
+
+
+def test_go_multi_term_exact_keyword_is_not_accessible(client, db_conn):
+    add_link(db_conn, "foo bar", "https://example.com")
+    rv = client.get("/go", query_string={"q": "foo bar"})
+    assert rv.status_code == 404
 
 
 def test_go_file_link_opens_and_confirms(client, db_conn, monkeypatch, test_config, tmp_path):
@@ -258,36 +262,6 @@ def test_go_file_path_checks(client, db_conn, monkeypatch, tmp_path):
 def test_go_exact_redirect_other_scheme(client, db_conn):
     add_link(db_conn, "mailto", "mailto:test@example.com", "Email")
     rv = client.get("/go", query_string={"q": "mailto"})
-    assert rv.status_code == 302
-
-
-def test_go_provider_template_unsupported_scheme(client, db_conn):
-    add_link(db_conn, "s", "javascript:{q}", "JS")
-    rv = client.get("/go", query_string={"q": "s test"})
-    assert rv.status_code == 400
-
-
-def test_go_provider_file_target(client, db_conn, tmp_path, monkeypatch):
-    path = tmp_path / "doc.txt"
-    path.write_text("hi", encoding="utf-8")
-    add_link(db_conn, "files", f"file://{path}")
-    monkeypatch.setattr(main, "file_url_to_path", lambda url: str(path))
-    monkeypatch.setattr(main, "is_allowed_path", lambda _p: True)
-    monkeypatch.setattr(os.path, "exists", lambda _p: True)
-    monkeypatch.setattr(main, "open_path_with_os", lambda _p: None)
-    rv = client.get("/go", query_string={"q": "files doc"})
-    assert rv.status_code == 200
-
-
-def test_go_provider_unsupported_scheme(client, db_conn):
-    add_link(db_conn, "s", "mailto:test@example.com", "Mail")
-    rv = client.get("/go", query_string={"q": "s extra"})
-    assert rv.status_code == 400
-
-
-def test_go_provider_http_passthrough(client, db_conn):
-    add_link(db_conn, "g", "https://example.com", "Example")
-    rv = client.get("/go", query_string={"q": "g cats"})
     assert rv.status_code == 302
 
 

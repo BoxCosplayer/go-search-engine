@@ -33,6 +33,8 @@ def links():
         title = (data.get("title") or "").strip() or None
         if not keyword or not url:
             return {"error": "keyword and url are required"}, 400
+        if any(ch.isspace() for ch in keyword):
+            return {"error": "keyword cannot contain whitespace"}, 400
         if not (url.startswith("http://") or url.startswith("https://")):
             return {"error": "url must start with http:// or https://"}, 400
         init_db()
@@ -79,6 +81,8 @@ def update_link(keyword: str):
 
     if not new_keyword or not new_url:
         return {"error": "keyword and url are required"}, 400  # pragma: no cover
+    if any(ch.isspace() for ch in new_keyword):
+        return {"error": "keyword cannot contain whitespace"}, 400
     if not (new_url.startswith("http://") or new_url.startswith("https://")):
         return {"error": "url must start with http:// or https://"}, 400
 

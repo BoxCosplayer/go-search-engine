@@ -4,7 +4,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from urllib.parse import quote, quote_plus, urlparse
+from urllib.parse import urlparse
 from urllib.request import url2pathname
 
 try:
@@ -38,42 +38,7 @@ _DEFAULT_CONFIG = {
     "fallback-url": "",
     "file-allow": [],
 }
-_ARG_INDEX_RE = re.compile(r"\{(\d+)\}")
 _TRAILING_PUNCT_RE = re.compile(r"[\s'\"`#@)\]\},.!?:;]+$")
-
-
-def split_query(raw: str):
-    """Split a raw query string into (keyword, remainder, words).
-
-    Args:
-        raw: The full input string (e.g., "gh issues open").
-
-    Returns:
-        tuple[str, str, list[str]]: (keyword, remainder, words)
-    """
-    parts = (raw or "").strip().split()
-    if not parts:
-        return "", "", []
-    return parts[0], " ".join(parts[1:]), parts[1:]
-
-
-def render_url_template(url_tmpl: str, full_q: str, args: str, words: list[str]) -> str:
-    """Render a URL template by substituting supported placeholders.
-
-    Supported placeholders: {q}, {args}, {args_raw}, {args_url}, and {1},{2},...
-    """
-    out = (
-        url_tmpl.replace("{q}", quote_plus(full_q))
-        .replace("{args}", quote_plus(args))
-        .replace("{args_raw}", args)
-        .replace("{args_url}", quote(args, safe=""))
-    )
-
-    def _repl(m):
-        i = int(m.group(1)) - 1
-        return quote_plus(words[i]) if 0 <= i < len(words) else ""
-
-    return _ARG_INDEX_RE.sub(_repl, out)
 
 
 def sanitize_query(raw: str) -> str:

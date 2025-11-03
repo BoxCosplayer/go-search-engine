@@ -20,9 +20,7 @@ from .utils import (
     file_url_to_path,
     is_allowed_path,
     open_path_with_os,
-    render_url_template,
     sanitize_query,
-    split_query,
 )
 
 try:
@@ -219,8 +217,7 @@ def go():
 
     Accepts `?q=<keyword>` and resolves it to a URL:
       - Exact match: 302 to the stored URL (supports http/https, file:// with safeguards)
-      - Prefix/template provider: expands placeholders and redirects
-      - No match: renders the suggestions page (not_found.html), optionally
+      - No match or multi-term query: renders the suggestions page (not_found.html), optionally
         showing a fallback search link when configured.
     """
     raw = (request.args.get("q") or "").strip()
@@ -229,14 +226,19 @@ def go():
         abort(400, "Missing q")
 
     db = get_db()
-    key, rest, words = split_query(q)
+    if any(ch.isspace() for ch in q):
+        suggestions = _search_suggestions(db, q)
+        fallback_url = ""
+        if FALLBACK_URL_TEMPLATE:
+            fallback_url = FALLBACK_URL_TEMPLATE.format(q=quote_plus(q))
+        return (
+            render_template("not_found.html", q=q, suggestions=suggestions, fallback_url=fallback_url),
+            404,
+        )
+
     exact = db.execute("SELECT url FROM links WHERE lower(keyword) = lower(?)", (q,)).fetchone()
 
-    prov = None
-    if not exact:
-        prov = db.execute("SELECT url FROM links WHERE lower(keyword) = lower(?)", (key,)).fetchone()
-
-    if exact and not prov:
+    if exact:
         url = exact["url"]
 
         if url.startswith(("http://", "https://")):
@@ -271,23 +273,6 @@ def go():
 
         return redirect(url, code=302)
 
-    if prov:
-        url_tmpl = prov["url"]
-        # If it's a template (contains placeholders), render it
-        if any(tok in url_tmpl for tok in ("{args", "{q}", "{1}", "{2}", "{3}")):
-            final_url = render_url_template(url_tmpl, q, rest, words)
-            if final_url.startswith(("http://", "https://")):
-                return redirect(final_url, code=302)
-            return ("Template resolved to unsupported scheme", 400)
-        # Not a template: if no args, just go; if args present, ignore args and go
-        if url_tmpl.startswith(("http://", "https://")):
-            return redirect(url_tmpl, code=302)
-        if url_tmpl.startswith("file://"):
-            path = file_url_to_path(url_tmpl)
-            # ... (unchanged)
-            return render_template("file_open.html", path=path), 200
-        return ("Unsupported URL scheme", 400)
-
     # Collect suggestions (prefix/substring matches on keyword/title/url)
     suggestions = _search_suggestions(db, q)
 
@@ -295,9 +280,10 @@ def go():
     if FALLBACK_URL_TEMPLATE:
         fallback_url = FALLBACK_URL_TEMPLATE.format(q=quote_plus(q))
 
-    return render_template(
-        "not_found.html", q=q, suggestions=[dict(x) for x in suggestions], fallback_url=fallback_url
-    ), 404
+    return (
+        render_template("not_found.html", q=q, suggestions=suggestions, fallback_url=fallback_url),
+        404,
+    )
 
 
 @app.route("/opensearch.xml")

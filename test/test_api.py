@@ -20,6 +20,8 @@ def test_links_post_validation_errors(client):
     assert rv.status_code == 400
     rv = client.post("/api/links", json={"keyword": "gh", "url": "ftp://example"})
     assert rv.status_code == 400
+    rv = client.post("/api/links", json={"keyword": "two words", "url": "https://example.com"})
+    assert rv.status_code == 400
 
 
 def test_links_post_duplicate_error(client):
@@ -68,6 +70,8 @@ def test_update_link_validation_and_conflict(client):
     rv = client.put("/api/links/a", json={"url": "ftp://invalid"})
     assert rv.status_code == 400
     rv = client.put("/api/links/a", json={"keyword": "b", "url": "https://a.com"})
+    assert rv.status_code == 400
+    rv = client.put("/api/links/a", json={"keyword": "multi term", "url": "https://a.com"})
     assert rv.status_code == 400
 
 

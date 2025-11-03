@@ -2,6 +2,11 @@
 
 ## [Major Versions Log](#major-versions-log)
 
+## 0.4.1
+
+- Removed support for multi-keyword searching
+- Whitespace in setting keyword presents error
+
 ## 0.4.0
 
 - Added OpenSearch description/suggestions endpoints and discovery tags
