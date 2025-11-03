@@ -9,9 +9,9 @@
 ~~fix pytest ci/cd~~
 ~~split each link to a separate file in /admin and /api~~
 ~~add agents.md and reformat the whole thing~~
+~~opensearch integration~~
 
 Search Flag
-~~opensearch integration~~
 
 fully rework readme:
     highlight dev installation
