@@ -4,7 +4,7 @@
 
 ## 0.5.2
 
-- Extended config/admin UI to expose a run-on-startup toggle
+- Extended config to expose a run on startup toggle
 
 ## 0.5.1
 
