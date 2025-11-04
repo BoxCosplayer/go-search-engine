@@ -2,9 +2,15 @@
 
 ## [Major Versions Log](#major-versions-log)
 
+## 0.5.1
+
+- Handled conflicts by prioritising newer keyword entries
+- Conflicts are detected by URLs and keywords
+
 ## 0.5.0
 
-- Added shortcuts export and import controls on the home UI; CSV downloads capture all shortcuts and uploads merge new entries into the existing database.
+- Added Imports and Exports for shortcuts
+- Added ability to extend current db with an import, rather than replace
 
 ## 0.4.2
 

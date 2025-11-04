@@ -492,6 +492,12 @@ def _select_links_with_lists(db):
     ).fetchall()
 
 
+def _delete_link(db, link_id):
+    """Remove a link and its list relationships."""
+    db.execute("DELETE FROM link_lists WHERE link_id=?", (link_id,))
+    db.execute("DELETE FROM links WHERE id=?", (link_id,))
+
+
 def _import_shortcuts_from_csv(db, file_storage):
     """Parse the provided CSV upload and merge shortcuts into the database."""
     payload = file_storage.read()
@@ -504,6 +510,7 @@ def _import_shortcuts_from_csv(db, file_storage):
     reader = csv.DictReader(buffer)
 
     inserted = 0
+    updated = 0
     for row in reader:
         keyword = (row.get("keyword") or "").strip()
         url = (row.get("url") or "").strip()
@@ -513,22 +520,47 @@ def _import_shortcuts_from_csv(db, file_storage):
         raw_flag = (row.get("search_enabled") or "").strip().lower()
         search_enabled = 1 if raw_flag in {"1", "true", "yes", "y", "on"} else 0
 
-        cur = db.execute(
-            "INSERT OR IGNORE INTO links(keyword, url, title, search_enabled) VALUES (?, ?, ?, ?)",
-            (keyword, url, title or None, search_enabled),
-        )
-        if cur.rowcount:
+        existing_keyword = db.execute(
+            "SELECT id FROM links WHERE lower(keyword)=lower(?)",
+            (keyword,),
+        ).fetchone()
+        existing_url = db.execute(
+            "SELECT id FROM links WHERE lower(url)=lower(?)",
+            (url,),
+        ).fetchone()
+
+        if existing_keyword:
+            link_id = existing_keyword["id"]
+            db.execute(
+                "UPDATE links SET keyword=?, url=?, title=?, search_enabled=? WHERE id=?",
+                (keyword, url, title or None, search_enabled, link_id),
+            )
+            updated += 1
+        elif existing_url:
+            link_id = existing_url["id"]
+            db.execute(
+                "UPDATE links SET keyword=?, url=?, title=?, search_enabled=? WHERE id=?",
+                (keyword, url, title or None, search_enabled, link_id),
+            )
+            updated += 1
+        else:
+            cur = db.execute(
+                "INSERT INTO links(keyword, url, title, search_enabled) VALUES (?, ?, ?, ?)",
+                (keyword, url, title or None, search_enabled),
+            )
+            link_id = cur.lastrowid
             inserted += 1
 
-        if cur.rowcount:
-            link_id = cur.lastrowid
-        else:
-            link_id = db.execute(
-                "SELECT id FROM links WHERE lower(keyword)=lower(?)",
-                (keyword,),
-            ).fetchone()["id"]
+        duplicates = db.execute(
+            "SELECT id FROM links WHERE lower(url)=lower(?) AND id <> ?",
+            (url, link_id),
+        ).fetchall()
+        for duplicate in duplicates:
+            _delete_link(db, duplicate["id"])
+
         lists_field = row.get("lists") or ""
         slugs = [slug.strip() for slug in lists_field.split(",") if slug.strip()]
+        list_ids: list[int] = []
         for slug in slugs:
             list_row = db.execute(
                 "SELECT id FROM lists WHERE lower(slug)=lower(?)",
@@ -542,11 +574,22 @@ def _import_shortcuts_from_csv(db, file_storage):
                     (slug, slug),
                 )
                 list_id = list_cursor.lastrowid
+            list_ids.append(list_id)
             db.execute(
                 "INSERT OR IGNORE INTO link_lists(link_id, list_id) VALUES (?, ?)",
                 (link_id, list_id),
             )
-    return inserted
+
+        if not list_ids:
+            db.execute("DELETE FROM link_lists WHERE link_id=?", (link_id,))
+        else:
+            placeholders = ",".join("?" for _ in list_ids)
+            db.execute(
+                f"DELETE FROM link_lists WHERE link_id=? AND list_id NOT IN ({placeholders})",
+                (link_id, *list_ids),
+            )
+
+    return inserted + updated
 
 
 @app.route("/healthz")

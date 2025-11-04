@@ -96,13 +96,29 @@ def test_import_shortcuts_csv(client, db_conn):
     assert rv.status_code == 302
     assert rv.headers["Location"].endswith("/")
 
-    # Existing link should remain unchanged.
+    # Existing link should be updated with newest data.
     existing = db_conn.execute(
         "SELECT title, search_enabled FROM links WHERE keyword=?",
         ("gh",),
     ).fetchone()
-    assert existing["title"] == "GitHub"
-    assert existing["search_enabled"] == 0
+    assert existing["title"] == "GitHub Updated"
+    assert existing["search_enabled"] == 1
+    assert (
+        db_conn.execute(
+            "SELECT url FROM links WHERE keyword=?",
+            ("gh",),
+        ).fetchone()["url"]
+        == "https://github.com/"
+    )
+    link_dev = db_conn.execute(
+        """
+        SELECT 1 FROM link_lists ll
+        JOIN lists li ON li.id = ll.list_id
+        WHERE ll.link_id = (SELECT id FROM links WHERE keyword=?) AND li.slug=?
+        """,
+        ("gh", "dev"),
+    ).fetchone()
+    assert link_dev is not None
 
     # New link should be inserted with its list relationship.
     new_link = db_conn.execute(
@@ -143,6 +159,48 @@ def test_import_shortcuts_with_blank_content(client, db_conn):
     assert rv.status_code == 302
     count = db_conn.execute("SELECT COUNT(*) FROM links").fetchone()[0]
     assert count == 0
+
+
+def test_import_shortcuts_prioritises_new_keyword_on_url_conflict(client, db_conn):
+    add_link(db_conn, "gh", "https://github.com", "GitHub")
+    add_link(db_conn, "old", "https://github.com", "Alias")
+    csv_payload = "\n".join(
+        [
+            "keyword,title,url,search_enabled,lists",
+            "github,GitHub,https://github.com,1,",
+        ]
+    ).encode("utf-8")
+    rv = client.post("/import/shortcuts", data={"file": (BytesIO(csv_payload), "shortcuts.csv")})
+    assert rv.status_code == 302
+    keywords = {row["keyword"] for row in db_conn.execute("SELECT keyword FROM links").fetchall()}
+    assert keywords == {"github"}
+    row = db_conn.execute(
+        "SELECT keyword, search_enabled FROM links WHERE lower(url)=lower(?)",
+        ("https://github.com",),
+    ).fetchone()
+    assert row["keyword"] == "github"
+    assert row["search_enabled"] == 1
+
+
+def test_import_shortcuts_replaces_existing_lists(client, db_conn):
+    add_link(db_conn, "gh", "https://github.com", "GitHub")
+    add_list(db_conn, "dev", "Dev")
+    add_list(db_conn, "docs", "Docs")
+    link_to_list(db_conn, "gh", "dev")
+    link_to_list(db_conn, "gh", "docs")
+    csv_payload = "\n".join(
+        [
+            "keyword,title,url,search_enabled,lists",
+            "gh,GitHub,https://github.com,0,",
+        ]
+    ).encode("utf-8")
+    rv = client.post("/import/shortcuts", data={"file": (BytesIO(csv_payload), "shortcuts.csv")})
+    assert rv.status_code == 302
+    remaining = db_conn.execute(
+        "SELECT COUNT(*) FROM link_lists WHERE link_id = (SELECT id FROM links WHERE keyword=?)",
+        ("gh",),
+    ).fetchone()[0]
+    assert remaining == 0
 
 
 def test_go_requires_query(client):

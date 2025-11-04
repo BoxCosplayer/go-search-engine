@@ -136,10 +136,11 @@ Use `python init_db.py` to ensure the database exists. Provide a CSV export to i
 
 ```bash
 python init_db.py links.csv
-# CSV columns: keyword,title,url
+# CSV columns: keyword,title,url,search_enabled,lists
 ```
 
 The script creates the base schema plus list tables so the admin UI works immediately.
+When importing, rows are matched by keyword or URL; newer entries overwrite existing shortcuts and the URL must be unique after the import.
 
 ## Add to browser
 
