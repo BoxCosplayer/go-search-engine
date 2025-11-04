@@ -121,6 +121,37 @@
       font-size: .95rem
     }
 
+    .toolbar {
+      margin-top: .75rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .toolbar .meta {
+      margin: 0;
+    }
+
+    .export-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: .55rem 1rem;
+      border-radius: 8px;
+      background: var(--accent);
+      color: #0b0f14;
+      font-weight: 600;
+      border: none;
+      transition: filter .2s ease;
+    }
+
+    .export-link:hover {
+      filter: brightness(1.08);
+      text-decoration: none;
+    }
+
     table {
       width: 100%;
       border-collapse: collapse;
@@ -191,9 +222,11 @@
       <button type="submit">Go</button>
     </form>
 
-    <div class="meta" id="matchCount"></div>
-
     <h2>Links</h2>
+    <div class="toolbar">
+      <div class="meta" id="matchCount"></div>
+      <a class="export-link" href="{{ url_for('export_shortcuts_csv') }}" download="shortcuts.csv">Export CSV</a>
+    </div>
     <table>
       <thead>
         <tr>

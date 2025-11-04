@@ -62,6 +62,21 @@ def test_index_renders_links(client, db_conn):
     assert b"dev" in rv.data
 
 
+def test_export_shortcuts_csv(client, db_conn):
+    add_link(db_conn, "gh", "https://github.com", "GitHub", search_enabled=True)
+    add_list(db_conn, "dev", "Dev")
+    link_to_list(db_conn, "gh", "dev")
+    rv = client.get("/export/shortcuts.csv")
+    assert rv.status_code == 200
+    assert rv.mimetype == "text/csv"
+    disposition = rv.headers.get("Content-Disposition", "")
+    assert "attachment" in disposition
+    assert "shortcuts.csv" in disposition
+    body = rv.data.decode("utf-8").splitlines()
+    assert body[0] == "keyword,title,url,search_enabled,lists"
+    assert any(line.startswith("gh,GitHub,https://github.com,1,dev") for line in body[1:])
+
+
 def test_go_requires_query(client):
     rv = client.get("/go")
     assert rv.status_code == 400

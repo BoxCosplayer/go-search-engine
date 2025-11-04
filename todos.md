@@ -10,19 +10,19 @@
 ~~split each link to a separate file in /admin and /api~~
 ~~add agents.md and reformat the whole thing~~
 ~~opensearch integration~~
-
 ~~Search Flag~~
 
-export/import
-
-fully rework readme:
-    highlight dev installation
-    add feature list
-    turn into a github wiki??
+export/import shortcuts db
 
 imbed run on startup inapp
 add EXEs as releases
 
+fully rework docs:
+    highlight dev installation
+    add feature list
+    turn into a github wiki??
+
+clean up code :3
 
 ## 2.0 features:
 

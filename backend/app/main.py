@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import json
 import os
 import re
@@ -10,6 +11,7 @@ import webbrowser
 import xml.etree.ElementTree as ET
 from functools import lru_cache
 from html.parser import HTMLParser
+from io import StringIO
 from urllib.parse import quote_plus, urljoin, urlparse
 
 import httpx
@@ -475,6 +477,21 @@ def _handle_bang_query(db, query: str):
     return _redirect_to_url(search_url)
 
 
+def _select_links_with_lists(db):
+    """Return rows of shortcuts with joined list slugs."""
+    return db.execute(
+        """
+        SELECT l.keyword, l.title, l.url, l.search_enabled,
+               IFNULL(GROUP_CONCAT(li.slug, ', '), '') AS lists_csv
+        FROM links l
+        LEFT JOIN link_lists ll ON ll.link_id = l.id
+        LEFT JOIN lists li ON li.id = ll.list_id
+        GROUP BY l.id
+        ORDER BY l.keyword COLLATE NOCASE
+        """
+    ).fetchall()
+
+
 @app.route("/healthz")
 def healthz():
     """Lightweight health check endpoint.
@@ -503,17 +520,35 @@ def index():
         return redirect(url_for("go", q=query), code=302)
     db = get_db()
     ensure_lists_schema(db)
-    # If you have the lists schema, this will include list slugs per link.
-    rows = db.execute("""
-        SELECT l.keyword, l.title, l.url, l.search_enabled,
-               IFNULL(GROUP_CONCAT(li.slug, ', '), '') AS lists_csv
-        FROM links l
-        LEFT JOIN link_lists ll ON ll.link_id = l.id
-        LEFT JOIN lists li ON li.id = ll.list_id
-        GROUP BY l.id
-        ORDER BY l.keyword COLLATE NOCASE
-    """).fetchall()
+    rows = _select_links_with_lists(db)
     return render_template("index.html", rows=rows)
+
+
+@app.route("/export/shortcuts.csv")
+def export_shortcuts_csv():
+    """Download all shortcuts as a CSV attachment."""
+    db = get_db()
+    ensure_lists_schema(db)
+    rows = _select_links_with_lists(db)
+
+    buffer = StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(["keyword", "title", "url", "search_enabled", "lists"])
+    for row in rows:
+        writer.writerow(
+            [
+                row["keyword"],
+                row["title"] or "",
+                row["url"],
+                "1" if row["search_enabled"] else "0",
+                row["lists_csv"] or "",
+            ]
+        )
+
+    csv_data = buffer.getvalue()
+    response = Response(csv_data, content_type="text/csv; charset=utf-8")
+    response.headers["Content-Disposition"] = 'attachment; filename="shortcuts.csv"'
+    return response
 
 
 @app.route("/go")

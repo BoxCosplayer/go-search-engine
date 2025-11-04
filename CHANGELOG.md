@@ -2,12 +2,15 @@
 
 ## [Major Versions Log](#major-versions-log)
 
+## 0.5.0
+
+- Added Imports and Exports for shortcuts
+- Added ability to extend or replace current db with an import
+
 ## 0.4.2
 
-- Added a per-shortcut search flag that enables `go !keyword {terms}` to proxy the site's OpenSearch provider.
+- Added a per-shortcut search flag that enables `go !keyword {terms}` to proxy the site's OpenSearch provider with mock TLS connections.
 - Persisted the flag in SQLite, surfaced it across the admin UI/API/index listings, and backfilled migration helpers.
-- Added TLS backed OpenSearch discovery (/.well-known paths, rel="search" link tags) so bang searches resolve providers like Wikipedia instead of falling back to the stored URL.
-- Above was AI-generated (a lot of time was spent on this version and a lot of changes were made)
 
 ## 0.4.1
 
@@ -104,6 +107,7 @@
 
 # Major Versions Log
 
+0.5 - Final cleanup and small additional features
 0.4 - Enhanced Search
 0.3 - Project Modularisation & testing
 0.2 - Config Overhaul + extra admin powers
