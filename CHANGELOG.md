@@ -12,6 +12,7 @@
 - Added Imports and Exports for shortcuts
 - Added ability to extend current db with an import, rather than replace
 
+
 ## 0.4.2
 
 - Added a per-shortcut search flag that enables `go !keyword {terms}` to proxy the site's OpenSearch provider with mock TLS connections.

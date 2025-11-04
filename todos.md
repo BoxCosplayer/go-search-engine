@@ -23,7 +23,7 @@ fully rework docs:
     turn into a github wiki??
 
 clean up code :3
-
+    - Include only one place for links info
 ## 2.0 features:
 
 authentication for adminUI / APIs

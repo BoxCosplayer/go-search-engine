@@ -47,7 +47,7 @@
     }
 
     .wrap {
-      width: min(900px, 100%)
+      width: min(900px, 100%);
     }
 
     h1 {
@@ -121,56 +121,6 @@
       font-size: .95rem
     }
 
-    .toolbar {
-      margin-top: .75rem;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 1rem;
-      flex-wrap: wrap;
-    }
-
-    .toolbar-actions {
-      display: flex;
-      gap: .75rem;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-
-    .toolbar .meta {
-      margin: 0;
-    }
-
-    .export-link {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: .55rem 1rem;
-      border-radius: 8px;
-      background: var(--accent);
-      color: #0b0f14;
-      font-weight: 600;
-      border: none;
-      transition: filter .2s ease;
-    }
-
-    .export-link:hover {
-      filter: brightness(1.08);
-      text-decoration: none;
-    }
-
-    .import-form {
-      display: flex;
-      gap: .5rem;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-
-    .import-form input[type="file"] {
-      max-width: 14rem;
-      color: var(--muted);
-    }
-
     table {
       width: 100%;
       border-collapse: collapse;
@@ -242,16 +192,7 @@
     </form>
 
     <h2>Links</h2>
-    <div class="toolbar">
-      <div class="meta" id="matchCount"></div>
-      <div class="toolbar-actions">
-        <form class="import-form" action="{{ url_for('import_shortcuts_csv') }}" method="post" enctype="multipart/form-data">
-          <input type="file" name="file" accept=".csv" required>
-          <button type="submit">Import CSV</button>
-        </form>
-        <a class="export-link" href="{{ url_for('export_shortcuts_csv') }}" download="shortcuts.csv">Export CSV</a>
-      </div>
-    </div>
+    <div class="meta" id="matchCount"></div>
     <table>
       <thead>
         <tr>
