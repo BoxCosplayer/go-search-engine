@@ -12,9 +12,8 @@ This local Flask app lets you type `go <keyword>` in your browser's address bar 
 - Optional system tray icon plus a PyInstaller spec for packaging a desktop helper
 
 ## Current TODOs:
-- 1.0 polish: lock the homepage keyword, finish API CRUD endpoints, complete README dev-install and feature docs, embed run-on-start, prepare EXE releases, wire up OpenSearch, add pytest scaffolding, and split admin/api link handlers.
-- Docs & agents: create `agents.md` and restructure the top-level documentation.
-- 2.0 roadmap: add admin/API authentication, separate admin flows, introduce rate limiting, harden DB usage, provide Docker packaging, and pursue performance improvements.
+- 1.0 polish: lock the homepage keyword, complete README with dev-install and user install, embed run-on-start, prepare EXE releases, and add docker docs
+- 2.0 roadmap: add admin/API authentication, separate admin flows, introduce rate limiting, harden DB usage and pursue performance / other security improvements.
 - 3.0 exploration: consider a Rust rewrite, expand official Linux/macOS support, and develop an enterprise-ready release.
 
 ## How it works
