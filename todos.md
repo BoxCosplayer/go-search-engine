@@ -11,10 +11,9 @@
 ~~add agents.md and reformat the whole thing~~
 ~~opensearch integration~~
 ~~Search Flag~~
-
 ~~export/import shortcuts db~~
 
-imbed run on startup inapp
+~~imbed run on startup inapp~~
 add EXEs as releases
 
 fully rework docs:
@@ -24,6 +23,7 @@ fully rework docs:
 
 clean up code :3
     - Include only one place for links info
+
 ## 2.0 features:
 
 authentication for adminUI / APIs

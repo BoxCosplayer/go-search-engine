@@ -100,6 +100,7 @@ The available keys:
 - `db-path` (str, default `backend/app/data/links.db`): absolute or relative path to the SQLite database file.
 - `allow-files` (bool): set to `true` to permit `file://` shortcuts when paths are in the allow list.
 - `file-allow` (list of strings): absolute directories that local file links may open. Leave empty to block file opens even if `allow-files` is true.
+- `run-on-startup` (bool, default `false`): exposes a preference for launching the packaged helper when the OS boots (consumed by the desktop tray build).
 - `fallback-url` (str, default empty): template used when no shortcut matches. Use `{q}` for the URL encoded query.
 
 You can point the app at another config file by setting the `GO_CONFIG_PATH` environment variable before launching. The admin Config page at `/admin/config` lets you edit and save these values through the browser with validation.

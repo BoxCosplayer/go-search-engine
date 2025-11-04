@@ -17,6 +17,7 @@ def prepare_test_config(monkeypatch, tmp_path):
         "allow-files": True,
         "fallback-url": "https://search.example/?q={q}",
         "file-allow": [str(tmp_path)],
+        "run-on-startup": False,
     }
     cfg_file.write_text(json.dumps(cfg_data, indent=2), encoding="utf-8")
 
@@ -43,6 +44,7 @@ def prepare_test_config(monkeypatch, tmp_path):
     monkeypatch.setattr(main_mod, "DEBUG", config_obj.debug, raising=False)
     monkeypatch.setattr(main_mod, "FALLBACK_URL_TEMPLATE", config_obj.fallback_url, raising=False)
     monkeypatch.setattr(main_mod, "ALLOW_FILES", config_obj.allow_files, raising=False)
+    monkeypatch.setattr(main_mod, "RUN_ON_STARTUP", config_obj.run_on_startup, raising=False)
     monkeypatch.setattr(main_mod, "BASE_DIR", str(tmp_path), raising=False)
 
     def fake_resource_path(name: str) -> str:

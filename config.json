@@ -7,5 +7,6 @@
     "fallback-url": "https://duckduckgo.com/?q={q}",
     "file-allow": [
         "/tmp"
-    ]
+    ],
+    "run-on-startup": true
 }

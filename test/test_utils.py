@@ -133,6 +133,7 @@ def test_load_config_validates_json(tmp_path, monkeypatch):
                 "allow-files": False,
                 "fallback-url": "",
                 "file-allow": [],
+                "run-on-startup": True,
             }
         ),
         encoding="utf-8",
@@ -141,6 +142,7 @@ def test_load_config_validates_json(tmp_path, monkeypatch):
     monkeypatch.setattr(utils, "_discover_config_path", lambda: cfg)
     loaded = utils.load_config()
     assert loaded.port == 4000
+    assert loaded.run_on_startup is True
 
 
 def test_load_config_raises_for_invalid_json(tmp_path, monkeypatch):
@@ -158,6 +160,7 @@ def test_load_config_missing_file_creates_default(tmp_path, monkeypatch):
     assert created.exists()
     data = json.loads(created.read_text(encoding="utf-8"))
     assert "db-path" in data
+    assert "run-on-startup" in data
 
 
 def test_to_slug_general_exception(monkeypatch):
@@ -213,6 +216,7 @@ def test_load_config_validation_error(monkeypatch, tmp_path):
                 "allow-files": False,
                 "fallback-url": "",
                 "file-allow": [],
+                "run-on-startup": False,
             }
         ),
         encoding="utf-8",

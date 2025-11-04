@@ -17,6 +17,7 @@ def _config_to_form_data(cfg: GoConfig) -> dict[str, object]:
         "allow_files": cfg.allow_files,
         "fallback_url": cfg.fallback_url,
         "file_allow": "\n".join(cfg.file_allow),
+        "run_on_startup": cfg.run_on_startup,
     }
 
 
@@ -50,6 +51,7 @@ def admin_config():
             "allow_files": "allow_files" in request.form,
             "fallback_url": fallback_url,
             "file_allow": file_allow_raw,
+            "run_on_startup": "run_on_startup" in request.form,
         }
 
         payload = {
@@ -60,6 +62,7 @@ def admin_config():
             "allow_files": form_values["allow_files"],
             "fallback_url": form_values["fallback_url"],
             "file_allow": file_allow_list,
+            "run_on_startup": form_values["run_on_startup"],
         }
 
         try:
