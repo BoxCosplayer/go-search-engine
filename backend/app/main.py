@@ -492,6 +492,63 @@ def _select_links_with_lists(db):
     ).fetchall()
 
 
+def _import_shortcuts_from_csv(db, file_storage):
+    """Parse the provided CSV upload and merge shortcuts into the database."""
+    payload = file_storage.read()
+    if not payload:
+        return 0
+    text = payload.decode("utf-8-sig") if isinstance(payload, bytes) else str(payload)
+    if not text.strip():
+        return 0
+    buffer = StringIO(text)
+    reader = csv.DictReader(buffer)
+
+    inserted = 0
+    for row in reader:
+        keyword = (row.get("keyword") or "").strip()
+        url = (row.get("url") or "").strip()
+        if not keyword or not url:
+            continue
+        title = (row.get("title") or "").strip()
+        raw_flag = (row.get("search_enabled") or "").strip().lower()
+        search_enabled = 1 if raw_flag in {"1", "true", "yes", "y", "on"} else 0
+
+        cur = db.execute(
+            "INSERT OR IGNORE INTO links(keyword, url, title, search_enabled) VALUES (?, ?, ?, ?)",
+            (keyword, url, title or None, search_enabled),
+        )
+        if cur.rowcount:
+            inserted += 1
+
+        if cur.rowcount:
+            link_id = cur.lastrowid
+        else:
+            link_id = db.execute(
+                "SELECT id FROM links WHERE lower(keyword)=lower(?)",
+                (keyword,),
+            ).fetchone()["id"]
+        lists_field = row.get("lists") or ""
+        slugs = [slug.strip() for slug in lists_field.split(",") if slug.strip()]
+        for slug in slugs:
+            list_row = db.execute(
+                "SELECT id FROM lists WHERE lower(slug)=lower(?)",
+                (slug,),
+            ).fetchone()
+            if list_row:
+                list_id = list_row["id"]
+            else:
+                list_cursor = db.execute(
+                    "INSERT INTO lists(slug, name) VALUES (?, ?)",
+                    (slug, slug),
+                )
+                list_id = list_cursor.lastrowid
+            db.execute(
+                "INSERT OR IGNORE INTO link_lists(link_id, list_id) VALUES (?, ?)",
+                (link_id, list_id),
+            )
+    return inserted
+
+
 @app.route("/healthz")
 def healthz():
     """Lightweight health check endpoint.
@@ -549,6 +606,21 @@ def export_shortcuts_csv():
     response = Response(csv_data, content_type="text/csv; charset=utf-8")
     response.headers["Content-Disposition"] = 'attachment; filename="shortcuts.csv"'
     return response
+
+
+@app.post("/import/shortcuts")
+def import_shortcuts_csv():
+    """Handle CSV uploads and merge shortcuts into the database."""
+    uploaded = request.files.get("file")
+    if uploaded is None or not uploaded.filename:
+        abort(400, "Missing CSV upload")
+    uploaded.stream.seek(0, os.SEEK_SET)
+
+    db = get_db()
+    ensure_lists_schema(db)
+    _import_shortcuts_from_csv(db, uploaded)
+    db.commit()
+    return redirect(url_for("index"))
 
 
 @app.route("/go")

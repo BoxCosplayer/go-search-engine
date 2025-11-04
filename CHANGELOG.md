@@ -4,8 +4,7 @@
 
 ## 0.5.0
 
-- Added Imports and Exports for shortcuts
-- Added ability to extend or replace current db with an import
+- Added shortcuts export and import controls on the home UI; CSV downloads capture all shortcuts and uploads merge new entries into the existing database.
 
 ## 0.4.2
 

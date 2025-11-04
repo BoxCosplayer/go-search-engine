@@ -12,7 +12,7 @@
 ~~opensearch integration~~
 ~~Search Flag~~
 
-export/import shortcuts db
+~~export/import shortcuts db~~
 
 imbed run on startup inapp
 add EXEs as releases

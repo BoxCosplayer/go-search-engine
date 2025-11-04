@@ -1,5 +1,6 @@
 import json
 import os
+from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
 from urllib.parse import quote_plus
@@ -75,6 +76,73 @@ def test_export_shortcuts_csv(client, db_conn):
     body = rv.data.decode("utf-8").splitlines()
     assert body[0] == "keyword,title,url,search_enabled,lists"
     assert any(line.startswith("gh,GitHub,https://github.com,1,dev") for line in body[1:])
+
+
+def test_import_shortcuts_csv(client, db_conn):
+    add_link(db_conn, "gh", "https://github.com", "GitHub")
+    add_list(db_conn, "dev", "Dev")
+    link_to_list(db_conn, "gh", "dev")
+
+    csv_payload = "\n".join(
+        [
+            "keyword,title,url,search_enabled,lists",
+            ",Skip Row,https://should-skip.example,1,",
+            "gh,GitHub Updated,https://github.com/,1,dev",
+            "docs,Docs,https://example.com/docs,0,help",
+        ]
+    ).encode("utf-8")
+    data = {"file": (BytesIO(csv_payload), "shortcuts.csv")}
+    rv = client.post("/import/shortcuts", data=data)
+    assert rv.status_code == 302
+    assert rv.headers["Location"].endswith("/")
+
+    # Existing link should remain unchanged.
+    existing = db_conn.execute(
+        "SELECT title, search_enabled FROM links WHERE keyword=?",
+        ("gh",),
+    ).fetchone()
+    assert existing["title"] == "GitHub"
+    assert existing["search_enabled"] == 0
+
+    # New link should be inserted with its list relationship.
+    new_link = db_conn.execute(
+        "SELECT id, title, url, search_enabled FROM links WHERE keyword=?",
+        ("docs",),
+    ).fetchone()
+    assert new_link["title"] == "Docs"
+    assert new_link["url"] == "https://example.com/docs"
+    assert new_link["search_enabled"] == 0
+
+    help_list = db_conn.execute(
+        "SELECT id FROM lists WHERE slug=?",
+        ("help",),
+    ).fetchone()
+    assert help_list is not None
+
+    junction = db_conn.execute(
+        "SELECT 1 FROM link_lists WHERE link_id=? AND list_id=?",
+        (new_link["id"], help_list["id"]),
+    ).fetchone()
+    assert junction is not None
+
+
+def test_import_shortcuts_requires_file(client):
+    rv = client.post("/import/shortcuts")
+    assert rv.status_code == 400
+
+
+def test_import_shortcuts_with_empty_file(client, db_conn):
+    rv = client.post("/import/shortcuts", data={"file": (BytesIO(b""), "empty.csv")})
+    assert rv.status_code == 302
+    count = db_conn.execute("SELECT COUNT(*) FROM links").fetchone()[0]
+    assert count == 0
+
+
+def test_import_shortcuts_with_blank_content(client, db_conn):
+    rv = client.post("/import/shortcuts", data={"file": (BytesIO(b"   \n "), "blank.csv")})
+    assert rv.status_code == 302
+    count = db_conn.execute("SELECT COUNT(*) FROM links").fetchone()[0]
+    assert count == 0
 
 
 def test_go_requires_query(client):

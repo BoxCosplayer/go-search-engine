@@ -130,6 +130,13 @@
       flex-wrap: wrap;
     }
 
+    .toolbar-actions {
+      display: flex;
+      gap: .75rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
     .toolbar .meta {
       margin: 0;
     }
@@ -150,6 +157,18 @@
     .export-link:hover {
       filter: brightness(1.08);
       text-decoration: none;
+    }
+
+    .import-form {
+      display: flex;
+      gap: .5rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .import-form input[type="file"] {
+      max-width: 14rem;
+      color: var(--muted);
     }
 
     table {
@@ -225,7 +244,13 @@
     <h2>Links</h2>
     <div class="toolbar">
       <div class="meta" id="matchCount"></div>
-      <a class="export-link" href="{{ url_for('export_shortcuts_csv') }}" download="shortcuts.csv">Export CSV</a>
+      <div class="toolbar-actions">
+        <form class="import-form" action="{{ url_for('import_shortcuts_csv') }}" method="post" enctype="multipart/form-data">
+          <input type="file" name="file" accept=".csv" required>
+          <button type="submit">Import CSV</button>
+        </form>
+        <a class="export-link" href="{{ url_for('export_shortcuts_csv') }}" download="shortcuts.csv">Export CSV</a>
+      </div>
     </div>
     <table>
       <thead>
