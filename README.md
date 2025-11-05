@@ -1,45 +1,128 @@
-﻿# go -- local shortcuts server
+# go -- local shortcuts server
 
-This local Flask app lets you type `go <keyword>` in your browser's address bar and jump straight to a stored URL. It uses Flask blueprints, Jinja templates, and an SQLite database behind a tiny admin UI.
+This Flask application lets you register memorable keywords, then jump to the right destination by typing `go <keyword>` (or `go !keyword cats`) in your browser's address bar. It ships with a lightweight admin UI, a JSON API, and optional desktop packaging.
 
 ## Features
-- Keyword driven redirects with substring suggestions and an optional fallback search link
-- Browser OpenSearch provider for one-click omnibox integration
-- Optional search bangs: mark a shortcut as searchable and use `go !keyword {terms}` to hand the query to the site's OpenSearch template.
+- Keyword-driven redirects with substring suggestions and an optional fallback search link
+- Browser OpenSearch provider for omnibox integration
+- Optional search bangs: mark a shortcut as searchable and use `go !keyword {terms}` to proxy the target site's query template
 - Optional local file launches guarded by an allow list of directories
 - Browser admin UI for links, lists, and runtime config (no authentication; intended for localhost)
 - JSON API surface for scripting link and list management
 - Optional system tray icon plus a PyInstaller spec for packaging a desktop helper
 
-## Current TODOs:
-- 1.0 polish: lock the homepage keyword, complete README with dev-install and user install, prepare EXE releases, and add docker docs
-- 2.0 roadmap: add admin/API authentication, separate admin flows, introduce rate limiting, harden DB usage and pursue performance / other security improvements.
-- 3.0 exploration: consider a Rust rewrite, expand official Linux/macOS support, and develop an enterprise-ready release.
+## Quick start
 
-## How it works
-- Shortcuts live in SQLite at `backend/app/data/links.db` by default (configurable).
-- Configure a browser search engine keyword such as `go` that points to `http://127.0.0.1:5000/go?q=%s`.
-- Exact keyword matches issue a 302 redirect. Non matches show suggestions.
-- Prefix a shortcut with `!` (for example `go !gh issues`) when its search flag is enabled to run the site's OpenSearch query. Without the flag the request falls back to the shortcut's default target.
-- Fallback searches come from the configured `fallback-url` string (for example DuckDuckGo or Google).
-- File shortcuts (`file://...`) only open when `allow-files` is true and the target path is inside the configured `file-allow` directories.
-- Runtime settings are loaded from `config.json` (generated from `config-template.txt` on first run).
+### Use the latest release (EXE)
 
-## Browser OpenSearch integration
-### Search bangs, OpenSearch, and hostile endpoints
+1. Download the most recent asset from the project's Releases page (for example `go-server-windows.zip`).
+2. Extract the archive; inside you'll find `go-server.exe`, `config-template.txt`, and supporting files.
+3. Double-click `go-server.exe`. On first launch the app copies `config-template.txt` to `config.json` if it is missing, then starts on `http://127.0.0.1:5000/`.
+4. Edit `config.json` (created next to the executable) to adjust host, port, or database location, then restart the binary.
+5. Browse to `http://127.0.0.1:5000/admin` to add your first shortcuts or lists.
 
-Turning on the `search_enabled` flag for a shortcut lets you run `go !keyword cats` and have the server inspect the target site’s OpenSearch descriptor. This works great for sites that expose `/opensearch.xml` or `<link rel="search">` without additional challenges (e.g., GitHub, Wikipedia, internal Confluence).
+The bundled build writes its SQLite data to `data/links.db` in the same directory as the executable unless you override `db-path` in `config.json`.
 
-A few public sites actively block automated fetches (notably stackoverflow.com and other Cloudflare-backed properties). When the descriptor can’t be retrieved, the bang falls back to the stored URL, which usually lands you on the home page. For those “hostile” endpoints, create the shortcut with an explicit search template instead: `https://stackoverflow.com/search?q={q}`. Leave the bang flag on, and the server will just substitute `{q}` without trying to fetch OpenSearch.
+### Development install
 
-### Search bangs, OpenSearch, and hostile endpoints
+```bash
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
 
-Turning on the `search_enabled` flag for a shortcut lets you run `go !keyword cats` and have the server inspect the target site’s OpenSearch descriptor. This works great for sites that expose `/opensearch.xml` or `<link rel="search">` without additional challenges (e.g., GitHub, Wikipedia, internal Confluence).
+# seed config.json on first run
+cp config-template.txt config.json  # Windows: copy config-template.txt config.json
 
-A few public sites actively block automated fetches (notably stackoverflow.com and other Cloudflare-backed properties). When the descriptor can’t be retrieved, the bang falls back to the stored URL, which usually lands you on the home page. For those “hostile” endpoints, create the shortcut with an explicit search template instead: `https://stackoverflow.com/search?q={q}`. Leave the bang flag on, and the server will just substitute `{q}` without trying to fetch OpenSearch.
-- The app advertises `/opensearch.xml`, so supporting browsers (Firefox, some Chromium forks) surface an â€œAdd goâ€ button automatically. Accept it to map the omnibox keyword to the server.
-- Chrome/Edge still allow manual configuration: add a custom search engine pointing to `http://127.0.0.1:5000/go?q=%s` with keyword `go`.
-- The optional `/opensearch/suggest` endpoint returns live completions for browsers that request OpenSearch suggestions (currently Firefox), backed by the same substring matching used on the not-found page.
+# ensure the SQLite schema exists (optional import step described below)
+python init_db.py
+
+# launch the development server
+python app.py
+```
+
+The development server binds to the `host` and `port` defined in `config.json` (defaults to `127.0.0.1:5000`) and stores data at the configured `db-path`.
+
+Run the tests before shipping changes:
+
+```bash
+python -m coverage run -m pytest            # Windows: .\.venv\Scripts\python.exe -m coverage run -m pytest
+coverage report --fail-under=100
+ruff check backend
+ruff format backend
+```
+
+## Browser integration
+
+- Configure a custom search engine (Chrome/Edge) or accept the "Add go" prompt (Firefox/compatible Chromium forks) pointing to `http://127.0.0.1:5000/go?q=%s` with keyword `go`.
+- Enable the `search_enabled` flag on a shortcut to run `go !keyword cats`. For sites that block OpenSearch descriptors (e.g., Stack Overflow), set a manual template such as `https://stackoverflow.com/search?q={q}`.
+- Optional endpoints `/opensearch.xml` and `/opensearch/suggest` help browsers discover the provider and surface live suggestions.
+
+## Configuration
+
+Runtime settings live in `config.json` (git ignored). The file is created automatically from `config-template.txt` the first time the app boots, or you can copy the template yourself before running.
+
+Available keys:
+
+- `host` (str, default `127.0.0.1`): network interface for the Flask server.
+- `port` (int, default `5000`): port to bind.
+- `debug` (bool, default `false`): enables Flask debug mode and reloader.
+- `db-path` (str, default `backend/app/data/links.db`): absolute or relative path to the SQLite database.
+- `allow-files` (bool): allow launching `file://` shortcuts when the target path is in the allow list.
+- `file-allow` (list of strings): absolute directories that local file links may open. Leave empty to block file opens even if `allow-files` is true.
+- `fallback-url` (str, default empty): template used when no shortcut matches; include `{q}` for the URL encoded query.
+
+Override the location of `config.json` by setting the `GO_CONFIG_PATH` environment variable before starting the server. The admin Config page at `/admin/config` also edits and saves these values with validation.
+
+## Using go
+
+### Manage shortcuts
+
+- Visit `http://127.0.0.1:5000/admin` to add, edit, delete, and tag shortcuts. List memberships are created automatically when you assign new slugs.
+- File shortcuts must use `file://` URLs, require `allow-files` set to true, and the target directory must exist in `file-allow`.
+- Keyword matching is case-insensitive; substring suggestions consider keyword, title, and URL fields.
+- `http://127.0.0.1:5000/lists` surfaces lists and their member shortcuts.
+
+Seed shortcuts from the command line with:
+
+```bash
+curl -X POST http://127.0.0.1:5000/api/links \
+  -H "content-type: application/json" \
+  -d '{"keyword":"cal","title":"My Calendar","url":"https://calendar.google.com"}'
+```
+
+### Import and export data
+
+Use `python init_db.py` to ensure the database exists or to import a CSV export:
+
+```bash
+python init_db.py links.csv
+# CSV columns: keyword,title,url,search_enabled,lists
+```
+
+Rows are matched by keyword or URL; newer entries overwrite existing shortcuts and URLs must be unique after import. The script also ensures the lists schema exists so the admin UI works immediately.
+
+Export the current shortcuts at any time:
+
+- Download `http://127.0.0.1:5000/export/shortcuts.csv`, or
+- Click **Export CSV** from the admin UI.
+
+## API endpoints
+
+- `GET /api/links` -- list all links.
+- `POST /api/links` -- add a link (`{"keyword":"gh","url":"https://github.com","title":"GitHub","search_enabled":true}`; the last flag is optional and defaults to `false`).
+- `GET /api/links/<keyword>` -- fetch a single link by keyword (case-insensitive).
+- `PUT /api/links/<keyword>` -- update keyword/title/url for an existing link.
+- `DELETE /api/links/<keyword>` -- remove a link.
+- `GET /api/lists` -- list lists.
+- `POST /api/lists` -- add a list (`{"slug":"work","name":"Work Projects","description":"..."}`).
+- `GET /api/lists/<slug>` -- fetch list metadata with its member links.
+- `PUT /api/lists/<slug>` / `PATCH /api/lists/<slug>` -- update slug/name/description.
+- `DELETE /api/lists/<slug>` -- delete a list (link memberships cascade).
+- `GET /api/lists/<slug>/links` -- list link memberships for a list.
+- `POST /api/lists/<slug>/links` -- add an existing link to a list (`{"keyword":"..."}`).
+- `DELETE /api/lists/<slug>/links/<keyword>` -- remove a link from a list.
+
+All responses are JSON. There is no authentication; run the service on trusted networks only.
 
 ## Project layout
 
@@ -62,126 +145,12 @@ init_db.py               # CLI helper to initialise/import the database
 requirements.txt         # App dependencies (includes lint/format tooling)
 ```
 
-## Quick start
+## Development workflow
 
-```bash
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-
-# create config.json if you do not have one yet
-cp config-template.txt config.json  # Windows: copy config-template.txt config.json
-
-# optional: create the SQLite database and lists schema up front
-python init_db.py
-
-# run the server (compat shim)
-python app.py
-
-# or run the package directly
-python -m backend
-
-# or via a WSGI server
-gunicorn backend.wsgi:application
-```
-
-The server listens on `host` and `port` from `config.json` (defaults to `127.0.0.1:5000`) and stores data at the configured `db-path`.
-
-## Configuration
-
-Runtime settings live in `config.json` (git ignored). The file is created automatically from `config-template.txt` the first time the app boots, or you can copy the template yourself before running.
-
-The available keys:
-
-- `host` (str, default `127.0.0.1`): network interface for the Flask server.
-- `port` (int, default `5000`): port to bind.
-- `debug` (bool, default `false`): enables Flask debug mode and reloader.
-- `db-path` (str, default `backend/app/data/links.db`): absolute or relative path to the SQLite database file.
-- `allow-files` (bool): set to `true` to permit `file://` shortcuts when paths are in the allow list.
-- `file-allow` (list of strings): absolute directories that local file links may open. Leave empty to block file opens even if `allow-files` is true.
-- `fallback-url` (str, default empty): template used when no shortcut matches. Use `{q}` for the URL encoded query.
-
-You can point the app at another config file by setting the `GO_CONFIG_PATH` environment variable before launching. The admin Config page at `/admin/config` lets you edit and save these values through the browser with validation.
-
-## Admin tools
-
-- `/admin`: list, add, edit, delete, and tag shortcuts; auto creates list links.
-- `/admin/config`: edit `config.json` through the browser (writes back to disk).
-- `/lists`: browse lists and view individual list pages.
-- `/healthz`: simple health probe for monitoring.
-
-The admin UI has no authentication and is intended for local use only.
-
-## Managing shortcuts
-
-- Open `http://127.0.0.1:5000/admin` to add or delete shortcuts through the form.
-- Use the Edit button on an existing row to tweak keywords, titles, or URLs; the form is pre-filled for convenience.
-- Assign comma separated list slugs via the "Set lists" action; missing lists are created automatically.
-- File shortcuts should use `file://` URLs. Ensure `allow-files` is true and the target directory is listed in `file-allow`.
-
-You can seed shortcuts from the command line with:
-
-```bash
-curl -X POST http://127.0.0.1:5000/api/links \
-  -H "content-type: application/json" \
-  -d '{"keyword":"cal","title":"My Calendar","url":"https://calendar.google.com"}'
-```
-
-(PowerShell users can replace the trailing backslashes with backticks or use a JSON file.)
-
-## Import or seed data
-
-Use `python init_db.py` to ensure the database exists. Provide a CSV export to import rows:
-
-```bash
-python init_db.py links.csv
-# CSV columns: keyword,title,url,search_enabled,lists
-```
-
-The script creates the base schema plus list tables so the admin UI works immediately.
-When importing, rows are matched by keyword or URL; newer entries overwrite existing shortcuts and the URL must be unique after the import.
-
-## Add to browser
-
-**Option A -- custom search engine (recommended)**
-
-1. Create a new search engine pointing to `http://127.0.0.1:5000/go?q=%s`.
-2. Set the keyword to something short like `go`.
-3. Type `go keyword` to jump straight to the shortcut.
-
-**Option B -- bookmark the home page**
-
-1. Bookmark `http://127.0.0.1:5000/`.
-2. Use the GUI to browse and manage shortcuts.
-
-## API endpoints
-
-- `GET /api/links` -- list all links.
-- `POST /api/links` -- add a link (`{"keyword":"gh","url":"https://github.com","title":"GitHub","search_enabled":true}`; the last flag is optional and defaults to `false`).
-- `GET /api/links/<keyword>` -- fetch a single link by keyword (case-insensitive).
-- `PUT /api/links/<keyword>` -- update keyword/title/url for an existing link.
-- `DELETE /api/links/<keyword>` -- remove a link.
-- `GET /api/lists` -- list lists.
-- `POST /api/lists` -- add a list (`{"slug":"work","name":"Work Projects","description":"..."}`).
-- `GET /api/lists/<slug>` -- fetch list metadata with its member links.
-- `PUT /api/lists/<slug>` / `PATCH /api/lists/<slug>` -- update slug/name/description.
-- `DELETE /api/lists/<slug>` -- delete a list (link memberships cascade).
-- `GET /api/lists/<slug>/links` -- list link memberships for a list.
-- `POST /api/lists/<slug>/links` -- add an existing link to a list (`{"keyword":"..."}`).
-- `DELETE /api/lists/<slug>/links/<keyword>` -- remove a link from a list.
-
-All responses are JSON. There is no authentication; run it on trusted networks only.
-
-## Development
-
-Install dependencies from `requirements.txt`, then run Ruff for linting/formatting:
-
-```bash
-ruff check backend
-ruff format backend
-```
-
-You can install Ruff globally via `pipx install ruff` if you prefer not to install it in the virtual environment.
+- Create pull requests with matching updates to `README.md`, `CHANGELOG.md`, and `todos.md` when behaviour changes.
+- Run `python -m coverage run -m pytest` and `coverage report --fail-under=100` before you push; CI enforces full coverage.
+- Keep lint tidy with `ruff check` and `ruff format`.
+- When scripting edits, respect blueprint re-export patterns; see `agents.md` for safe-edit guidelines.
 
 ## Build an executable (PyInstaller)
 
@@ -201,27 +170,22 @@ pyinstaller -F -n go-server app.py --add-data "backend/app/templates;backend/app
 
 When run from a bundled executable, the app writes the SQLite database under `data/links.db` next to the binary unless overridden via `config.json`.
 
-## Notes
+## Operational notes
 
 - The app assumes localhost usage and exposes no authentication; keep it firewalled.
-- `file://` targets are only opened when both `allow-files` is true and the path is inside `file-allow`.
-- Matching is case insensitive for keywords; substring suggestions consider keyword, title, and URL.
-- If `pystray` and `pillow` are installed, the tray icon offers quick links to Home and Admin.
+- Enabling `allow-files` without scoping `file-allow` may expose sensitive paths; configure both.
+- The tray icon (via `pystray` and `pillow`) offers quick links to Home and Admin when those packages are installed.
+
+## Roadmap
+
+High-level planning lives in `todos.md`. Upcoming milestones focus on 1.0 documentation polish, 2.0 authentication and hardening, and longer-term platform support explorations.
+
+## How to contribute
+
+- Read this README plus `todos.md` to understand current priorities.
+- Prefer focused commits with clear scope and updated docs.
+- Automation or agent workflows should start with `agents.md` and reuse existing helpers when extending blueprints.
 
 ## License
 
 MIT. See `LICENSE` for details.
-
-## How to Contribute
-
-1. **Humans**
-   - Read the README and `todos.md` to see current priorities.
-   - Run `python -m venv .venv` (or `.\.venv\Scripts\activate` on Windows) and `pip install -r requirements.txt`.
-   - Use `.\.venv\Scripts\python.exe -m coverage run -m pytest` (Windows) or `python -m coverage run -m pytest` (Linux/macOS) to make sure all tests pass; `coverage report --fail-under=100` must hold green before you ship changes.
-   - Prefer focused commits with matching updates to docs (`README.md`, `CHANGELOG.md`, `todos.md`) when behavior shifts.
-   - Keep lint tidy with `ruff check` / `ruff format`. They run fast and match CI.
-
-2. **Automation / agents**
-   - Start by reading `agents.md`; it spells out the structure, testing expectations, and safe-edit guidelines tailored to this repo.
-   - When scripting edits, reuse the helper functions already in the blueprint modules and respect the re-export patterns described there.
-

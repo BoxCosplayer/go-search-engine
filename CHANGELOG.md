@@ -2,6 +2,9 @@
 
 ## [Major Versions Log](#major-versions-log)
 
+## 1.0.0
+
+
 ## 0.5.2
 
 - Added a workflow that builds and publishes a release on every push
@@ -117,6 +120,7 @@
 
 # Major Versions Log
 
+1.0 - Reworked documentation
 0.5 - Final cleanup and small additional features
 0.4 - Enhanced Search
 0.3 - Project Modularisation & testing

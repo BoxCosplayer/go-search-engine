@@ -14,13 +14,11 @@
 ~~export/import shortcuts db~~
 ~~add EXEs as releases (cd??)~~
 
-fully rework docs:
+fully rework documentation{
     highlight dev installation
     add feature list
     turn into a github wiki??
-
-clean up code :3
-    - Include only one place for links info
+}
 
 ## 2.0 features:
 
