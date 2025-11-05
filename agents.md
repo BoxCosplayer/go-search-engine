@@ -22,6 +22,11 @@ This project may rely on automation or AI-assisted agents to keep the codebase c
 4. **Keep docs in sync**
    - Update README snippets, CHANGELOG entries, and API docs when behavior changes.
    - Surface new CLI flags or environment expectations here for future agents.
+   - When a release or feature warrants a version bump, update the app version constant in `backend/app/__init__.py` alongside the changelog.
+   - If configuration keys change, update `config-template.txt`, reflect the new values in `README.md`, and adjust fixtures (see `test/conftest.py`) so tests reference the right defaults.
+   - Keep the README Quick start sections aligned with reality: verify the EXE bundle still ships with `config-template.txt` and that development setup commands remain accurate.
+   - Before tagging a release, run a checklist: bump the version constant, finalize the changelog entry, rebuild the PyInstaller artifact via `go-server.spec`, execute coverage/ruff gates, and smoke-test the EXE (config creation, CSV export, search bangs).
+   - When tooling or dependencies move, update `.github/workflows/ci.yml` and `requirements.txt` so automation stays current.
 
 ## Testing & Quality Gates
 - Always run `.\.venv\Scripts\python.exe -m coverage run -m pytest` (or `python -m coverage run -m pytest` on Linux) after code changes.
@@ -39,4 +44,7 @@ This project may rely on automation or AI-assisted agents to keep the codebase c
 - Use `todos.md` for longer-running follow-ups; keep entries actionable.
 - Log coverage adjustments or temporary skips directly in commit/PR descriptions.
 
-Sticking to this checklist keeps agent-driven changes predictable, testable, and aligned with the repository’s guarantees. Feel free to expand this guide as new automation patterns emerge.
+Sticking to this checklist keeps agent-driven changes predictable, testable, and aligned with the repository's guarantees. Feel free to expand this guide as new automation patterns emerge.
+
+
+

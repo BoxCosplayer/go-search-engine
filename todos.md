@@ -13,12 +13,7 @@
 ~~Search Flag~~
 ~~export/import shortcuts db~~
 ~~add EXEs as releases (cd??)~~
-
-fully rework documentation{
-    highlight dev installation
-    add feature list
-    turn into a github wiki??
-}
+~~fully rework documentation~~
 
 ## 2.0 features:
 

@@ -4,6 +4,7 @@
 
 ## 1.0.0
 
+- Fully reworked documentation
 
 ## 0.5.2
 
