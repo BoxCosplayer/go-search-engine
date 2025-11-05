@@ -37,7 +37,6 @@ _DEFAULT_CONFIG = {
     "allow-files": True,
     "fallback-url": "",
     "file-allow": [],
-    "run-on-startup": False,
 }
 _TRAILING_PUNCT_RE = re.compile(r"[\s'\"`#@)\]\},.!?:;]+$")
 
@@ -136,7 +135,6 @@ class GoConfig(BaseModel):
     allow_files: bool = Field(False, alias="allow-files")
     fallback_url: str = Field("", alias="fallback-url")
     file_allow: list[str] = Field(default_factory=list, alias="file-allow")
-    run_on_startup: bool = Field(False, alias="run-on-startup")
 
     # Pydantic v2 config if available; fallback to v1
     if ConfigDict:

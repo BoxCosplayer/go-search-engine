@@ -35,7 +35,6 @@ def test_admin_config_get_and_post(client):
         "allow_files": "on",
         "fallback_url": "https://duck.example/?q={q}",
         "file_allow": "/data\n/tmp",
-        "run_on_startup": "on",
     }
     rv = client.post("/admin/config", data=data, follow_redirects=True)
     assert rv.status_code == 200
@@ -45,7 +44,6 @@ def test_admin_config_get_and_post(client):
     assert blob["debug"] is True
     assert blob["port"] == 6000
     assert blob["file-allow"] == ["/data", "/tmp"]
-    assert blob["run-on-startup"] is True
 
 
 def test_admin_module_reexports(monkeypatch, tmp_path):

@@ -247,11 +247,6 @@
           <label for="allow_files">Allow opening local file paths</label>
         </div>
 
-        <div class="checkbox-row">
-          <input id="run_on_startup" name="run_on_startup" type="checkbox" {% if form.run_on_startup %}checked{% endif %}>
-          <label for="run_on_startup">Launch go-server at system startup</label>
-        </div>
-
         <label for="db_path">Database path
           <input id="db_path" name="db_path" type="text" value="{{ form.db_path }}" required>
           <span>Absolute or product-relative path to the SQLite database file.</span>

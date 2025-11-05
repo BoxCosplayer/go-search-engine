@@ -12,9 +12,7 @@
 ~~opensearch integration~~
 ~~Search Flag~~
 ~~export/import shortcuts db~~
-
-~~imbed run on startup inapp~~
-add EXEs as releases
+add EXEs as releases (cd??)
 
 fully rework docs:
     highlight dev installation

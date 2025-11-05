@@ -4,7 +4,6 @@
     "debug": false,
     "db-path": "backend/app/data/links.db",
     "allow-files": true,
-    "run-on-startup": false,
     "fallback-url": "",
     "file-allow": []
 }

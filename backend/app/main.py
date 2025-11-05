@@ -63,7 +63,6 @@ PORT = config.port
 DEBUG = config.debug
 FALLBACK_URL_TEMPLATE = config.fallback_url  # e.g. "https://duckduckgo.com/?q={q}"
 ALLOW_FILES = config.allow_files
-RUN_ON_STARTUP = config.run_on_startup
 
 OPENSEARCH_TIMEOUT = 5
 OPENSEARCH_USER_AGENT = (
