@@ -121,7 +121,7 @@
 
 # Major Versions Log
 
-- 1.0 - Reworked documentation
+- **1.0** - Reworked documentation
 
 - 0.5 - Final cleanup and small additional features
 - 0.4 - Enhanced Search
