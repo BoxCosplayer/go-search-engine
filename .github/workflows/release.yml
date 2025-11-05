@@ -53,6 +53,10 @@ jobs:
       - name: Package executable archive
         shell: pwsh
         run: |
+          $distPath = Join-Path "dist" "go-server"
+          if (-not (Test-Path $distPath)) {
+            throw "Expected PyInstaller output at $distPath but it was not found."
+          }
           $zipName = "go-server-$env:APP_VERSION-windows.zip"
           $releaseDir = "release"
           if (-not (Test-Path $releaseDir)) {
@@ -62,7 +66,7 @@ jobs:
           if (Test-Path $zipPath) {
             Remove-Item $zipPath
           }
-          Compress-Archive -Path "dist/go-server" -DestinationPath $zipPath
+          Compress-Archive -Path $distPath -DestinationPath $zipPath
           "ZIP_PATH=$zipPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Publish release
