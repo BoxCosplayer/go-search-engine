@@ -2,6 +2,10 @@
 
 ## [Major Versions Log](#major-versions-log)
 
+## 0.5.2
+
+- Added a workflow that builds and publishes a release on every push
+
 ## 0.5.1
 
 - Handled conflicts by prioritising newer keyword entries

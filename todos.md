@@ -12,7 +12,7 @@
 ~~opensearch integration~~
 ~~Search Flag~~
 ~~export/import shortcuts db~~
-add EXEs as releases (cd??)
+~~add EXEs as releases (cd??)~~
 
 fully rework docs:
     highlight dev installation
