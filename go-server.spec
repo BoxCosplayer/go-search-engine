@@ -5,7 +5,7 @@ from pathlib import Path
 
 def collect_template_files():
     """Return (src, dest) tuples for every template asset."""
-    templates_root = Path(__file__).parent / "backend" / "app" / "templates"
+    templates_root = Path(__name__).parent / "backend" / "app" / "templates"
     datas = []
     for path in templates_root.rglob("*"):
         if path.is_file():
