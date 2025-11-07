@@ -1,9 +1,6 @@
 # escape=`
 
-ARG PYTHON_IMAGE=mcr.microsoft.com/windows/python:3.11-windowsservercore-ltsc2022
-ARG RUNTIME_IMAGE=mcr.microsoft.com/windows/servercore:ltsc2022
-
-FROM ${PYTHON_IMAGE} AS build
+FROM python:3.11-windowsservercore-ltsc2022 AS build
 SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 WORKDIR C:\\src
 
@@ -24,7 +21,7 @@ RUN if (-not (Test-Path 'config.json') -and (Test-Path 'config-template.txt')) {
 
 RUN pyinstaller go-server.spec
 
-FROM ${RUNTIME_IMAGE} AS runtime
+FROM mcr.microsoft.com/windows/servercore:ltsc2022 AS runtime
 SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 WORKDIR C:\\app
 

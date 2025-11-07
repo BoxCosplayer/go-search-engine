@@ -6,6 +6,7 @@
 
 - Added a Windows Dockerfile and entrypoint script so the packaged EXE can run inside Docker
 - Documented the container workflow and wired CI to build the image on every push
+- Switched the build stage to the official `python:3.11-windowsservercore-ltsc2022` base so CI resolves the manifest reliably
 
 ## 1.0.0
 
