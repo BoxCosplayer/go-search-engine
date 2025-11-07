@@ -51,6 +51,7 @@ jobs:
         run: pyinstaller go-server.spec
 
       - name: Prepare executable asset
+        id: prepare-exe
         shell: pwsh
         run: |
           $candidatePaths = @(
@@ -74,14 +75,15 @@ jobs:
           $assetName = "go-server-$env:APP_VERSION-windows.exe"
           $assetPath = Join-Path $releaseDir $assetName
           Copy-Item -Path $exePath -Destination $assetPath -Force
-          "ASSET_PATH=$assetPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $assetPathForward = $assetPath -replace '\\', '/'
+          "asset_path=$assetPathForward" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
       - name: Publish release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ env.APP_VERSION }}-${{ github.run_number }}
           name: v${{ env.APP_VERSION }}
-          files: ${{ env.ASSET_PATH }}
+          files: ${{ steps.prepare-exe.outputs.asset_path }}
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
