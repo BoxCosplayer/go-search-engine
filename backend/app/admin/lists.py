@@ -73,12 +73,14 @@ def admin_set_lists():
 def admin_list_delete():
     """Delete a list by slug and redirect to the lists index."""
     db = get_db()
+    ensure_lists_schema(db)
     slug = (request.form.get("slug") or "").strip()
     if not slug:
         abort(400, "missing slug")
-    row = db.execute("SELECT id FROM lists WHERE lower(slug)=lower(?)", (slug,)).fetchone()
+    row = db.execute("SELECT id, slug FROM lists WHERE lower(slug)=lower(?)", (slug,)).fetchone()
     if not row:
         abort(404, "list not found")
     db.execute("DELETE FROM lists WHERE id=?", (row["id"],))
+    db.execute("DELETE FROM links WHERE lower(keyword)=lower(?)", (row["slug"],))
     db.commit()
     return redirect("/lists")

@@ -148,6 +148,8 @@ def test_admin_list_flow(client, db_conn):
 
     rv = client.post("/admin/list-delete", data={"slug": slug})
     assert rv.status_code == 302
+    count = db_conn.execute("SELECT COUNT(*) AS c FROM links WHERE lower(keyword)=lower(?)", (slug,)).fetchone()["c"]
+    assert count == 0
 
 
 def test_admin_update_validation_and_errors(client):

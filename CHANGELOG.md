@@ -2,6 +2,10 @@
 
 ## [Major Versions Log](#major-versions-log)
 
+## 1.1.1
+
+- Deleting a list now also removes the automatically generated shortcut link
+
 ## 1.1.0
 
 - Added a Windows Dockerfile and entrypoint script so the packaged EXE can run inside Docker
@@ -127,6 +131,7 @@
 
 # Major Versions Log
 
+- 1.1 - Publication & QoL updates
 - **1.0** - Reworked documentation
 
 - 0.5 - Final cleanup and small additional features
