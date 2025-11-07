@@ -126,10 +126,11 @@
 
 # Major Versions Log
 
-1.0 - Reworked documentation
-0.5 - Final cleanup and small additional features
-0.4 - Enhanced Search
-0.3 - Project Modularisation & testing
-0.2 - Config Overhaul + extra admin powers
-0.1 - Initial Project Publication
-0.0 - Private project development, for private use
+- **1.0** - Reworked documentation
+
+- 0.5 - Final cleanup and small additional features
+- 0.4 - Enhanced Search
+- 0.3 - Project Modularisation & testing
+- 0.2 - Config Overhaul + extra admin powers
+- 0.1 - Initial Project Publication
+- 0.0 - Private project development, for private use
