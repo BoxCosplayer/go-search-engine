@@ -121,6 +121,13 @@ def test_ensure_config_file_exists_creates_from_template(tmp_path, monkeypatch):
     assert json.loads(cfg.read_text(encoding="utf-8")) == {"host": "0.0.0.0"}
 
 
+def test_discover_config_path_honors_env(monkeypatch, tmp_path):
+    cfg = tmp_path / "nested" / "config.json"
+    cfg.parent.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("GO_CONFIG_PATH", str(cfg))
+    assert utils._discover_config_path() == cfg.resolve()
+
+
 def test_load_config_validates_json(tmp_path, monkeypatch):
     cfg = tmp_path / "config.json"
     cfg.write_text(

@@ -23,6 +23,29 @@ This Flask application lets you register memorable keywords, then jump to the ri
 
 The bundled build writes its SQLite data to `data/links.db` in the same directory as the executable unless you override `db-path` in `config.json`.
 
+### Run the EXE inside Docker (Windows containers)
+
+1. Make sure Docker Desktop is running in **Windows container** mode (the PyInstaller binary targets Windows; Linux containers are not supported as of yet).
+2. Build the image (the multi-stage build runs PyInstaller for you):
+   ```powershell
+   docker build -t go-server:exe .
+   ```
+3. Launch the container. The entrypoint stores config and the database under `C:\data`, so bind a volume to persist them:
+   ```powershell
+   docker run --rm -p 5000:5000 -v go-data:C:\data go-server:exe
+   ```
+
+The entrypoint copies `config-template.txt` into `C:\data\config.json` on first start, forces `host` to `0.0.0.0`, and points `db-path` at `C:\data\links.db`. Mount an existing config file instead if you prefer:
+
+```powershell
+docker run --rm -p 8080:5000 `
+  -v ${PWD}\docker-config.json:C:\data\config.json `
+  -v ${PWD}\links.db:C:\data\links.db `
+  go-server:exe
+```
+
+`GO_CONFIG_PATH` defaults to `C:\data\config.json` inside the container, so standard config overrides continue to work if you move the file elsewhere.
+
 ### Development install
 
 ```bash
@@ -143,6 +166,8 @@ config-template.txt      # Example config copied when config.json is missing
 config.json              # Runtime config (git ignored)
 init_db.py               # CLI helper to initialise/import the database
 requirements.txt         # App dependencies (includes lint/format tooling)
+Dockerfile               # Multi-stage Windows container that runs the PyInstaller exe
+docker/entrypoint.ps1    # Ensures config/db paths exist inside the container
 ```
 
 ## Development workflow

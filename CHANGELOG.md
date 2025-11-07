@@ -2,6 +2,11 @@
 
 ## [Major Versions Log](#major-versions-log)
 
+## 1.1.0
+
+- Added a Windows Dockerfile and entrypoint script so the packaged EXE can run inside Docker
+- Documented the container workflow and wired CI to build the image on every push
+
 ## 1.0.0
 
 - Fully reworked documentation

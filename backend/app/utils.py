@@ -147,11 +147,10 @@ class GoConfig(BaseModel):
 
 
 def _discover_config_path() -> Path:
-    """Return absolute path to the project-root config.json.
-
-    Assumes config.json is always located at the repository root
-    (two directories above this file).
-    """
+    """Return absolute path to config.json, honoring GO_CONFIG_PATH overrides."""
+    override = os.environ.get("GO_CONFIG_PATH")
+    if override:
+        return Path(override).expanduser()
     return Path(__file__).resolve().parents[2] / "config.json"
 
 

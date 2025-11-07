@@ -37,3 +37,15 @@ jobs:
         run: |
           coverage run -m pytest --no-summary
           coverage report --fail-under=100
+
+  docker-windows:
+    runs-on: windows-latest
+    needs:
+      - ruff
+      - tests
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Windows Docker image
+        shell: pwsh
+        run: docker build -t go-server:test .
