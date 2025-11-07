@@ -2,6 +2,10 @@
 
 ## [Major Versions Log](#major-versions-log)
 
+## 1.1.3
+
+- Updated release to only include the exe file
+
 ## 1.1.2
 
 - Creating a list via adding a new list to a link behaves identically to creating normal lists
@@ -19,6 +23,7 @@
 ## 1.0.0
 
 - Fully reworked documentation
+
 
 ## 0.5.2
 

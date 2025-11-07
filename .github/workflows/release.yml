@@ -50,36 +50,38 @@ jobs:
       - name: Build executable with PyInstaller
         run: pyinstaller go-server.spec
 
-      - name: Package executable archive
+      - name: Prepare executable asset
         shell: pwsh
         run: |
-          $dirPath = Join-Path "dist" "go-server"
-          $filePath = Join-Path "dist" "go-server.exe"
-          if (Test-Path $dirPath) {
-            $sourcePath = $dirPath
-          } elseif (Test-Path $filePath) {
-            $sourcePath = $filePath
-          } else {
-            throw "Expected PyInstaller output at either $dirPath or $filePath but neither was found."
+          $candidatePaths = @(
+            (Join-Path "dist" "go-server.exe"),
+            (Join-Path (Join-Path "dist" "go-server") "go-server.exe")
+          )
+          $exePath = $null
+          foreach ($path in $candidatePaths) {
+            if (Test-Path $path) {
+              $exePath = $path
+              break
+            }
           }
-          $zipName = "go-server-$env:APP_VERSION-windows.zip"
+          if (-not $exePath) {
+            throw "Unable to locate go-server executable in expected paths."
+          }
           $releaseDir = "release"
           if (-not (Test-Path $releaseDir)) {
             New-Item -Path $releaseDir -ItemType Directory | Out-Null
           }
-          $zipPath = Join-Path $releaseDir $zipName
-          if (Test-Path $zipPath) {
-            Remove-Item $zipPath
-          }
-          Compress-Archive -Path $sourcePath -DestinationPath $zipPath
-          "ZIP_PATH=$zipPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $assetName = "go-server-$env:APP_VERSION-windows.exe"
+          $assetPath = Join-Path $releaseDir $assetName
+          Copy-Item -Path $exePath -Destination $assetPath -Force
+          "ASSET_PATH=$assetPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Publish release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ env.APP_VERSION }}-${{ github.run_number }}
           name: v${{ env.APP_VERSION }}
-          files: ${{ env.ZIP_PATH }}
+          files: ${{ env.ASSET_PATH }}
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
