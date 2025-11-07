@@ -1,9 +1,21 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-from PyInstaller.utils.hooks import collect_data_files
+from pathlib import Path
 
-# Include Jinja templates for Flask
-tmpl_datas = collect_data_files('backend.app', includes=['templates/*.html', 'templates/**/*.html'])
+
+def collect_template_files():
+    """Return (src, dest) tuples for every template asset."""
+    templates_root = Path(__file__).parent / "backend" / "app" / "templates"
+    datas = []
+    for path in templates_root.rglob("*"):
+        if path.is_file():
+            rel = path.relative_to(templates_root)
+            dest = Path("backend") / "app" / "templates" / rel
+            datas.append((str(path), str(dest)))
+    return datas
+
+
+tmpl_datas = collect_template_files()
 
 a = Analysis(
     ['app.py'],

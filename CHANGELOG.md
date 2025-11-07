@@ -5,6 +5,7 @@
 ## 1.1.3
 
 - Updated release to only include the exe file
+- Standalone EXE now bundles the Flask templates so admin pages render correctly
 
 ## 1.1.2
 
