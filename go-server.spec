@@ -1,27 +1,14 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-from pathlib import Path
+from PyInstaller.building.datastruct import Tree
 
-
-def collect_template_files():
-    """Return (src, dest) tuples for every template asset."""
-    templates_root = Path(__name__).parent / "backend" / "app" / "templates"
-    datas = []
-    for path in templates_root.rglob("*"):
-        if path.is_file():
-            rel = path.relative_to(templates_root)
-            dest = Path("backend") / "app" / "templates" / rel
-            datas.append((str(path), str(dest)))
-    return datas
-
-
-tmpl_datas = collect_template_files()
+template_datas = list(Tree("backend/app/templates", prefix="backend/app/templates"))
 
 a = Analysis(
     ['app.py'],
     pathex=[],
     binaries=[],
-    datas=[('config.json', '.')] + tmpl_datas,
+    datas=[('config.json', '.')] + template_datas,
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

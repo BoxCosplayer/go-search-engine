@@ -287,7 +287,7 @@ def load_config():
 
 
 if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):  # pragma: no cover
-    _TEMPLATES_DIR = os.path.join(sys._MEIPASS, "backend", "app", "templates")  # type: ignore[attr-defined]
+    _TEMPLATES_DIR = _resource_path(os.path.join("backend", "app", "templates"))
 else:
     _TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), "templates")
 
