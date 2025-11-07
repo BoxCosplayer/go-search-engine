@@ -1,3 +1,5 @@
+from contextlib import suppress
+
 from flask import abort, redirect, request
 
 from ..db import ensure_lists_schema, get_db
@@ -68,10 +70,10 @@ def admin_set_lists():
         for slug_value, name in new_lists:
             list_url = f"{base_url}/lists/{slug_value}"
             title = f"List - {name}"
-            try:
-                db.execute("INSERT INTO links(keyword, url, title) VALUES (?, ?, ?)", (slug_value, list_url, title))
-            except Exception:  # pragma: no cover - defensive; tested via happy path
-                pass
+            with suppress(Exception):  # pragma: no cover - defensive; tested via happy path
+                db.execute(
+                    "INSERT INTO links(keyword, url, title) VALUES (?, ?, ?)", (slug_value, list_url, title)
+                )
         db.commit()
 
     db.execute("DELETE FROM link_lists WHERE link_id=?", (link_id,))
