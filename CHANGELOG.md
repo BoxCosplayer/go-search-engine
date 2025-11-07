@@ -2,6 +2,10 @@
 
 ## [Major Versions Log](#major-versions-log)
 
+## 1.1.2
+
+- Creating a list via adding a new list to a link behaves identically to creating normal lists
+
 ## 1.1.1
 
 - Deleting a list now also removes the automatically generated shortcut link

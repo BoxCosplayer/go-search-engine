@@ -206,6 +206,21 @@ def test_admin_set_lists_missing_link(client):
     assert rv.status_code == 404
 
 
+def test_admin_set_lists_auto_list_link(client, db_conn):
+    client.post("/admin/add", data={"keyword": "gh", "url": "https://github.com"})
+
+    rv = client.post("/admin/set-lists", data={"keyword": "gh", "slugs": "new-list"})
+    assert rv.status_code == 302
+
+    list_row = db_conn.execute("SELECT slug FROM lists WHERE slug='new-list'").fetchone()
+    assert list_row is not None
+
+    link_row = db_conn.execute("SELECT url, title FROM links WHERE keyword='new-list'").fetchone()
+    assert link_row is not None
+    assert link_row["url"].endswith("/lists/new-list")
+    assert link_row["title"] == "List - New List"
+
+
 def test_admin_list_delete_validation(client):
     rv = client.post("/admin/list-delete", data={"slug": ""})
     assert rv.status_code == 400

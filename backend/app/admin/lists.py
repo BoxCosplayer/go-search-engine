@@ -54,12 +54,25 @@ def admin_set_lists():
     slugs = [s.strip().lower() for s in slugs_raw.split(",") if s.strip()]
     slugs = sorted(set(slugs))
 
+    new_lists = []
     for slug in slugs:
         row = db.execute("SELECT id FROM lists WHERE slug=?", (slug,)).fetchone()
         if not row:
             name = slug.replace("-", " ").title()
             db.execute("INSERT INTO lists(slug, name) VALUES (?, ?)", (slug, name))
+            new_lists.append((slug, name))
     db.commit()
+
+    if new_lists:
+        base_url = request.host_url.rstrip("/")
+        for slug_value, name in new_lists:
+            list_url = f"{base_url}/lists/{slug_value}"
+            title = f"List - {name}"
+            try:
+                db.execute("INSERT INTO links(keyword, url, title) VALUES (?, ?, ?)", (slug_value, list_url, title))
+            except Exception:  # pragma: no cover - defensive; tested via happy path
+                pass
+        db.commit()
 
     db.execute("DELETE FROM link_lists WHERE link_id=?", (link_id,))
     for slug in slugs:
