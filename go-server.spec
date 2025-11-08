@@ -2,13 +2,11 @@
 
 from PyInstaller.building.datastruct import Tree
 
-template_datas = list(Tree("backend/app/templates", prefix="backend/app/templates"))
-
 a = Analysis(
     ['app.py'],
     pathex=[],
     binaries=[],
-    datas=[('config.json', '.')] + template_datas,
+    datas=[('config.json', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -18,6 +16,8 @@ a = Analysis(
     optimize=0,
 )
 pyz = PYZ(a.pure)
+
+a.datas += Tree("backend/app/templates", prefix="backend/app/templates")
 
 exe = EXE(
     pyz,
