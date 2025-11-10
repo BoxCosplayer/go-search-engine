@@ -28,7 +28,7 @@ def test_admin_config_get_and_post(client):
 
     cfg_path = config_routes._discover_config_path()
     data = {
-        "host": "0.0.0.0",
+        "host": "127.0.0.1",
         "port": "6000",
         "debug": "on",
         "db_path": "db.sqlite",
@@ -40,7 +40,7 @@ def test_admin_config_get_and_post(client):
     assert rv.status_code == 200
 
     blob = json.loads(cfg_path.read_text(encoding="utf-8"))
-    assert blob["host"] == "0.0.0.0"
+    assert blob["host"] == "127.0.0.1"
     assert blob["debug"] is True
     assert blob["port"] == 6000
     assert blob["file-allow"] == ["/data", "/tmp"]

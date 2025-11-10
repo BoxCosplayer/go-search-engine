@@ -23,28 +23,55 @@ This Flask application lets you register memorable keywords, then jump to the ri
 
 The bundled build writes its SQLite data to `data/links.db` in the same directory as the executable unless you override `db-path` in `config.json`.
 
-### Run the EXE inside Docker (Windows containers)
+### Run in Docker
 
-1. Make sure Docker Desktop is running in **Windows container** mode (the PyInstaller binary targets Windows; Linux containers are not supported as of yet).
-2. Build the image (the multi-stage build runs PyInstaller for you):
+#### Linux containers (Gunicorn)
+
+1. Pull the published image (`ghcr.io/<your-github-org-or-user>/go-server:latest`) or build it locally:
+   ```bash
+   docker build -f docker/Dockerfile.linux -t go-server:linux .
+   ```
+2. Run it with a bind mount or named volume for `/data` (config + SQLite live there) and expose the HTTP port:
+   ```bash
+   docker run --rm -p 5000:5000 -v go-data:/data ghcr.io/<owner>/go-server:latest
+   ```
+3. The Bash entrypoint copies `config-template.txt` into `/data/config.json` on first start, rewrites `host`, `port`, and `db-path` when needed, and then boots Gunicorn via `backend.wsgi:application`.
+
+A note on naming: replace `<owner>` with the GitHub org/user that hosts this repository (CI publishes tags to `ghcr.io/<owner>/go-server:<version>` plus `:latest`).
+
+A compose stack is included for repeatable local setups:
+
+```bash
+docker compose up --build
+```
+
+Environment variables accepted by both Linux and Windows containers:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `GO_CONFIG_PATH` | `/data/config.json` (Linux) / `C:\data\config.json` (Windows) | Location of the runtime config file. |
+| `GO_DB_PATH` | `/data/links.db` / `C:\data\links.db` | SQLite destination written into `config.json`. |
+| `GO_HOST` | `127.0.0.1` | Network interface Gunicorn/EXE should bind to. |
+| `GO_PORT` | `5000` | External port exposed by the container. |
+| `GO_GUNICORN_WORKERS` | `2` | (Linux image) Worker processes for Gunicorn. |
+| `GO_GUNICORN_TIMEOUT` | `60` | (Linux image) Request timeout for Gunicorn, in seconds. |
+| `GO_GUNICORN_EXTRA_ARGS` | *(empty)* | (Linux image) Extra CLI switches appended to the default Gunicorn command. |
+
+Override any of these at `docker run`/compose time to match your environment.
+
+#### Windows containers (bundled EXE)
+
+1. Switch Docker Desktop to **Windows container** mode.
+2. Build the image (multi-stage PyInstaller build):
    ```powershell
    docker build -t go-server:exe .
    ```
-3. Launch the container. The entrypoint stores config and the database under `C:\data`, so bind a volume to persist them:
+3. Launch the container and persist data under `C:\data`:
    ```powershell
    docker run --rm -p 5000:5000 -v go-data:C:\data go-server:exe
    ```
 
-The entrypoint copies `config-template.txt` into `C:\data\config.json` on first start, forces `host` to `0.0.0.0`, and points `db-path` at `C:\data\links.db`. Mount an existing config file instead if you prefer:
-
-```powershell
-docker run --rm -p 8080:5000 `
-  -v ${PWD}\docker-config.json:C:\data\config.json `
-  -v ${PWD}\links.db:C:\data\links.db `
-  go-server:exe
-```
-
-`GO_CONFIG_PATH` defaults to `C:\data\config.json` inside the container, so standard config overrides continue to work if you move the file elsewhere.
+Mount existing config/database files in the same way as before; the PowerShell entrypoint now honors the same `GO_HOST`, `GO_PORT`, and `GO_DB_PATH` overrides as the Linux image.
 
 ### Development install
 
@@ -167,7 +194,10 @@ config.json              # Runtime config (git ignored)
 init_db.py               # CLI helper to initialise/import the database
 requirements.txt         # App dependencies (includes lint/format tooling)
 Dockerfile               # Multi-stage Windows container that runs the PyInstaller exe
+docker/Dockerfile.linux  # Gunicorn-based Linux image that runs the source tree
+docker/entrypoint.sh     # Linux entrypoint that patches config/db paths
 docker/entrypoint.ps1    # Ensures config/db paths exist inside the container
+docker-compose.yml       # Local stack wiring the Linux container + volume
 ```
 
 ## Development workflow

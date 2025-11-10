@@ -7,10 +7,65 @@ on:
 
 permissions:
   contents: write
+  packages: write
 
 jobs:
+  publish-linux-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Determine app version
+        id: version
+        run: |
+          VERSION=$(python - <<'PY'
+from pathlib import Path
+lines = Path("backend/app/__init__.py").read_text().splitlines()
+for line in lines:
+    if line.startswith("__version__"):
+        print(line.split("=", 1)[1].strip().strip('"').strip("'"))
+        break
+else:
+    raise SystemExit("Could not determine application version.")
+PY
+)
+          VERSION="${VERSION#"${VERSION%%[![:space:]]*}"}"
+          VERSION="${VERSION%"${VERSION##*[![:space:]]}"}"
+          if [ -z "$VERSION" ]; then
+            echo "Version lookup returned empty string." >&2
+            exit 1
+          fi
+          echo "APP_VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Linux image
+        env:
+          IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/go-server
+        run: |
+          docker buildx build \
+            --platform linux/amd64 \
+            -f docker/Dockerfile.linux \
+            -t ${IMAGE_NAME}:${{ steps.version.outputs.version }} \
+            -t ${IMAGE_NAME}:latest \
+            --push .
+
   build-and-release:
     runs-on: windows-latest
+    needs:
+      - publish-linux-image
     steps:
       - uses: actions/checkout@v4
 

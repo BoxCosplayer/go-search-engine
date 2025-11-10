@@ -2,10 +2,15 @@
 
 ## [Major Versions Log](#major-versions-log)
 
+## 1.1.4
+
+- Expanded the docker architecture
+- Docker files now supports Linux Operating Systems
+
 ## 1.1.3
 
-- Updated release to only include the exe file
-- Standalone EXE now bundles the Flask templates and loads them from the packaged resources so admin pages render correctly
+- Updated release to include the exe file
+- EXE now bundles the Flask templates and loads them from the packaged resources so pages render successfully
 
 ## 1.1.2
 
