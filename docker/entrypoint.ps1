@@ -75,7 +75,7 @@ function Initialize-Config {
     $json | ConvertTo-Json -Depth 6 | Set-Content -Path $ConfigPath -Encoding utf8NoBOM
 }
 
-function Ensure-DbDirectory {
+function Initialize-DbDirectory {
     param([string]$ConfigPath)
     try {
         $cfg = Get-Content -Path $ConfigPath -Raw | ConvertFrom-Json
@@ -134,7 +134,7 @@ if (-not $configPath) {
 $templateSource = Join-Path -Path 'C:\app' -ChildPath 'config-template.txt'
 Initialize-Config -ConfigPath $configPath -TemplateSource $templateSource
 Update-ConfigFromEnv -ConfigPath $configPath
-Ensure-DbDirectory -ConfigPath $configPath
+Initialize-DbDirectory -ConfigPath $configPath
 
 if (-not (Test-Path -Path $Executable)) {
     throw "Executable not found at $Executable"
