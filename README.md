@@ -15,29 +15,36 @@ This Flask application lets you register memorable keywords, then jump to the ri
 
 ### Use the latest release (EXE)
 
-1. Download the most recent asset from the project's Releases page (for example `go-server-windows.zip`).
-2. Extract the archive; inside you'll find `go-server.exe`, `config-template.txt`, and supporting files.
-3. Double-click `go-server.exe`. On first launch the app copies `config-template.txt` to `config.json` if it is missing, then starts on `http://127.0.0.1:5000/`.
-4. Edit `config.json` (created next to the executable) to adjust host, port, or database location, then restart the binary.
-5. Browse to `http://127.0.0.1:5000/admin` to add your first shortcuts or lists.
+1. Download the most recent EXE asset from the project's Releases page.
+2. Double-click `go-server.exe` Inside a new folder. The app creates `config.json` as well as the `data` folder, then starts on `http://127.0.0.1:5000/`.
+3. Edit `config.json` (created next to the executable) to adjust host, port, or database location, then restart the binary.
+4. Browse to `http://127.0.0.1:5000/admin` to add your first shortcuts or lists.
 
-The bundled build writes its SQLite data to `data/links.db` in the same directory as the executable unless you override `db-path` in `config.json`.
+The bundled build writes its SQLite data to `links.db` in the same directory as the executable unless you override `db-path` in `config.json`.
 
 ### Run in Docker
 
 #### Linux containers (Gunicorn)
 
-1. Pull the published image (`ghcr.io/<your-github-org-or-user>/go-server:latest`) or build it locally:
+1. Pull the published image (`ghcr.io/boxcosplayer/go-server:latest`) or build it locally:
    ```bash
    docker build -f docker/Dockerfile.linux -t go-server:linux .
    ```
 2. Run it with a bind mount or named volume for `/data` (config + SQLite live there) and expose the HTTP port:
    ```bash
-   docker run --rm -p 5000:5000 -v go-data:/data ghcr.io/<owner>/go-server:latest
+   docker run --rm -p 5000:5000 -v go-data:/data ghcr.io/boxcosplayer/go-server:latest
    ```
 3. The Bash entrypoint copies `config-template.txt` into `/data/config.json` on first start, rewrites `host`, `port`, and `db-path` when needed, and then boots Gunicorn via `backend.wsgi:application`.
 
-A note on naming: replace `<owner>` with the GitHub org/user that hosts this repository (CI publishes tags to `ghcr.io/<owner>/go-server:<version>` plus `:latest`).
+Need a different listener? The container now defaults to `GO_HOST=127.0.0.1` / `GO_PORT=5000`, so `docker run` works without extra flags. Override them by passing matching `-e` switches and publishing the same port, e.g.:
+
+```bash
+docker run --rm \
+  -e GO_PORT=8080 \
+  -p 8080:8080 \
+  -v go-data:/data \
+  ghcr.io/boxcosplayer/go-server:latest
+```
 
 A compose stack is included for repeatable local setups:
 
@@ -45,21 +52,23 @@ A compose stack is included for repeatable local setups:
 docker compose up --build
 ```
 
-Environment variables accepted by both Linux and Windows containers:
+To override settings with Compose, set environment variables before running (e.g. `GO_PORT=8080 docker compose up --build`) or create a `.env` file; `docker-compose.yml` already reads `${GO_HOST}`, `${GO_PORT}`, and `${GO_DB_PATH}` with sensible defaults.
+
+Environment variables accepted by Linux (Gunicorn) containers:
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `GO_CONFIG_PATH` | `/data/config.json` (Linux) / `C:\data\config.json` (Windows) | Location of the runtime config file. |
 | `GO_DB_PATH` | `/data/links.db` / `C:\data\links.db` | SQLite destination written into `config.json`. |
-| `GO_HOST` | `127.0.0.1` | Network interface Gunicorn/EXE should bind to. |
-| `GO_PORT` | `5000` | External port exposed by the container. |
-| `GO_GUNICORN_WORKERS` | `2` | (Linux image) Worker processes for Gunicorn. |
-| `GO_GUNICORN_TIMEOUT` | `60` | (Linux image) Request timeout for Gunicorn, in seconds. |
-| `GO_GUNICORN_EXTRA_ARGS` | *(empty)* | (Linux image) Extra CLI switches appended to the default Gunicorn command. |
+| `GO_HOST` | `127.0.0.1` | Interface the server binds to inside the container. |
+| `GO_PORT` | `5000` | In-container TCP port; match the host mapping when overriding. |
+| `GO_GUNICORN_WORKERS` | `2` | Worker processes for Gunicorn. |
+| `GO_GUNICORN_TIMEOUT` | `60` | Request timeout for Gunicorn, in seconds. |
+| `GO_GUNICORN_EXTRA_ARGS` | *(empty)* | Extra CLI switches appended to the default Gunicorn command. |
 
 Override any of these at `docker run`/compose time to match your environment.
 
-#### Windows containers (bundled EXE)
+#### Windows containers (with the bundled EXE)
 
 1. Switch Docker Desktop to **Windows container** mode.
 2. Build the image (multi-stage PyInstaller build):
@@ -71,7 +80,15 @@ Override any of these at `docker run`/compose time to match your environment.
    docker run --rm -p 5000:5000 -v go-data:C:\data go-server:exe
    ```
 
-Mount existing config/database files in the same way as before; the PowerShell entrypoint now honors the same `GO_HOST`, `GO_PORT`, and `GO_DB_PATH` overrides as the Linux image.
+Mount existing config/database files in the same way as before; the PowerShell entrypoint defaults to `GO_HOST=127.0.0.1`, `GO_PORT=5000`, and honors the same overrides as the Linux image (for example `docker run ... -e GO_PORT=8080 -p 8080:8080 ...`).
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `GO_CONFIG_PATH` | `C:\data\config.json` | Location of the runtime config file. |
+| `GO_DB_PATH` | `C:\data\links.db` | SQLite destination written into `config.json`. |
+| `GO_HOST` | `127.0.0.1` | Interface the server binds to inside the container. |
+| `GO_PORT` | `5000` | In-container TCP port; match the host mapping when overriding. |
+
 
 ### Development install
 
@@ -116,7 +133,7 @@ Available keys:
 - `host` (str, default `127.0.0.1`): network interface for the Flask server.
 - `port` (int, default `5000`): port to bind.
 - `debug` (bool, default `false`): enables Flask debug mode and reloader.
-- `db-path` (str, default `backend/app/data/links.db`): absolute or relative path to the SQLite database.
+- `db-path` (str, default `links.db`): absolute or relative path to the SQLite database.
 - `allow-files` (bool): allow launching `file://` shortcuts when the target path is in the allow list.
 - `file-allow` (list of strings): absolute directories that local file links may open. Leave empty to block file opens even if `allow-files` is true.
 - `fallback-url` (str, default empty): template used when no shortcut matches; include `{q}` for the URL encoded query.
@@ -146,10 +163,11 @@ Use `python init_db.py` to ensure the database exists or to import a CSV export:
 
 ```bash
 python init_db.py links.csv
-# CSV columns: keyword,title,url,search_enabled,lists
+# CSV columns: keyword,title,url
+# extra columns are ignored if present
 ```
 
-Rows are matched by keyword or URL; newer entries overwrite existing shortcuts and URLs must be unique after import. The script also ensures the lists schema exists so the admin UI works immediately.
+Each row is matched by keyword—the importer inserts new shortcuts and prints a warning when a keyword already exists (it does not overwrite). Ensure URLs remain unique yourself via the admin UI or API. The script also ensures the lists schema exists so the admin UI works immediately.
 
 Export the current shortcuts at any time:
 

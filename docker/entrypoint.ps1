@@ -27,14 +27,15 @@ function Initialize-Config {
 
     if (Test-Path -Path $TemplateSource) {
         Copy-Item -Path $TemplateSource -Destination $ConfigPath
-    } else {
+    }
+    else {
         # Minimal default when the template is unavailable.
         $default = @{
-            host        = '127.0.0.1'
-            port        = 5000
-            debug       = $false
-            'db-path'   = 'C:\data\links.db'
-            'allow-files' = $false
+            host           = '127.0.0.1'
+            port           = 5000
+            debug          = $false
+            'db-path'      = 'C:\data\links.db'
+            'allow-files'  = $false
             'fallback-url' = ''
             'file-allow'   = @()
         }
@@ -44,16 +45,17 @@ function Initialize-Config {
 
     try {
         $json = Get-Content -Path $ConfigPath -Raw | ConvertFrom-Json
-    } catch {
+    }
+    catch {
         Write-Warning "Failed to parse config template: $_. Using safe defaults."
         $json = [ordered]@{
-            host = '127.0.0.1'
-            port = 5000
-            debug = $false
-            'db-path' = 'C:\data\links.db'
-            'allow-files' = $false
+            host           = '127.0.0.1'
+            port           = 5000
+            debug          = $false
+            'db-path'      = 'C:\data\links.db'
+            'allow-files'  = $false
             'fallback-url' = ''
-            'file-allow' = @()
+            'file-allow'   = @()
         }
     }
 
@@ -78,7 +80,8 @@ function Ensure-DbDirectory {
     try {
         $cfg = Get-Content -Path $ConfigPath -Raw | ConvertFrom-Json
         $dbPath = if ($cfg.'db-path') { $cfg.'db-path' } else { 'C:\data\links.db' }
-    } catch {
+    }
+    catch {
         Write-Warning "Unable to parse $ConfigPath for db-path. Falling back to C:\data\links.db. $_"
         $dbPath = 'C:\data\links.db'
     }
@@ -94,7 +97,8 @@ function Update-ConfigFromEnv {
 
     try {
         $cfg = Get-Content -Path $ConfigPath -Raw | ConvertFrom-Json
-    } catch {
+    }
+    catch {
         Write-Warning "Unable to parse $ConfigPath for overrides. $_"
         return
     }

@@ -50,13 +50,11 @@ try:
 except Exception:
     data = {}
 
-def ensure(key, default):
-    value = data.get(key)
-    if value in (None, "", "127.0.0.1"):
-        data[key] = default
-
-ensure("host", os.environ["GO_HOST"])
-ensure("port", int(os.environ["GO_PORT"]))
+data["host"] = os.environ["GO_HOST"]
+try:
+    data["port"] = int(os.environ["GO_PORT"])
+except (TypeError, ValueError):
+    data["port"] = 5000
 
 db_path = data.get("db-path")
 if not db_path or db_path in ("backend/app/data/links.db", "links.db"):

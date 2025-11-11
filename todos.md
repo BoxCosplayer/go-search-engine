@@ -19,6 +19,7 @@
 
 ~~Docker support~~
 ~~publish docker image to ghcr / release job~~
+package a setup-exe that creates a new folder with the real exe instead of relying on user to run in an empty folder
 authentication for adminUI / APIs
 rework adminUI; split off adding links to somewhere w/o authentication
 API ratelimiting

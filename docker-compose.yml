@@ -8,9 +8,9 @@ services:
     ports:
       - "5000:5000"
     environment:
-      GO_HOST: 127.0.0.1
-      GO_PORT: 5000
-      GO_DB_PATH: /data/links.db
+      GO_HOST: ${GO_HOST:-127.0.0.1}
+      GO_PORT: ${GO_PORT:-5000}
+      GO_DB_PATH: ${GO_DB_PATH:-/data/links.db}
     volumes:
       - go-data:/data
 

@@ -2,6 +2,10 @@
 
 ## [Major Versions Log](#major-versions-log)
 
+## 1.1.5
+
+- Updated the docker documentation
+
 ## 1.1.4
 
 - Expanded the docker architecture
