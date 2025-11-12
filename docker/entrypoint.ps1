@@ -69,7 +69,9 @@ function Initialize-Config {
         -not $json.'db-path' -or
         $json.'db-path' -eq 'backend/app/data/links.db' -or
         $json.'db-path' -eq 'data/links.db' -or
-        $json.'db-path' -eq 'links.db'
+        $json.'db-path' -eq 'links.db' -or
+        $json.'db-path' -eq '{APPDATA}/go-search-engine/links.db' -or
+        $json.'db-path' -eq '%APPDATA%/go-search-engine/links.db'
     ) {
         $json.'db-path' = $env:GO_DB_PATH
     }

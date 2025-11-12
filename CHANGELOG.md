@@ -3,6 +3,20 @@
 ## [Major Versions Log](#major-versions-log)
 
 
+## 1.1.9
+
+- Removed the auto-created `data/` folder next to the executable; both `config.json` and `links.db` now live under the user's application data directory (`%APPDATA%\go-search-engine`, `~/Library/Application Support/go-search-engine`, or `~/.local/share/go-search-engine`).
+- Updated docs, defaults, and helpers so new installs and legacy configs consistently redirect to the profile-specific location.
+
+## 1.1.8
+
+- Defaulted `db-path` to the user's application data directory (`%APPDATA%\go-search-engine\links.db` on Windows, `~/Library/Application Support/go-search-engine/links.db` on macOS, `~/.local/share/go-search-engine/links.db` on Linux) and upgrade legacy configs automatically so the database lives outside the app folder by default.
+
+## 1.1.7
+
+- Config files now live under `data/config.json` so the standalone EXE keeps configuration and SQLite data together, matching the Docker layout.
+- Relative `db-path` values are resolved next to `config.json`, and the app ensures the database directory exists before connecting (so custom locations work without manual setup).
+
 ## 1.1.6
 
 - Fixed the bundled executable so it now creates `config.json` next to the `.exe` (matching the colocated SQLite database) when no config file exists.

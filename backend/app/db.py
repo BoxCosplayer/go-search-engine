@@ -28,7 +28,6 @@ DB_PATH = config.db_path
 def get_db():
     """Get a request-scoped SQLite connection.
 
-    - Creates the `data/` directory under BASE_DIR if needed.
     - Enables `PRAGMA foreign_keys = ON`.
     - Stores the connection in Flask's `g` so each request reuses a single
       connection.
@@ -37,8 +36,9 @@ def get_db():
         sqlite3.Connection: The open database connection.
     """
     if "db" not in g:
-        os.makedirs(os.path.join(BASE_DIR, "data"), exist_ok=True)
         db_file = Path(DB_PATH)
+        if not db_file.is_absolute():
+            db_file = Path(BASE_DIR) / db_file
         db_file.parent.mkdir(parents=True, exist_ok=True)
         g.db = sqlite3.connect(str(db_file))
         g.db.row_factory = sqlite3.Row

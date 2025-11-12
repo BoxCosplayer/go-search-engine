@@ -2,7 +2,7 @@
 """
 Initialize the SQLite database and optionally import links from a CSV file.
 Usage:
-  python init_db.py                # creates data/links.db
+  python init_db.py                # creates the default user-data links.db
   python init_db.py links.csv      # also imports CSV rows
 CSV format:
   keyword,title,url
@@ -12,15 +12,29 @@ import csv
 import os
 import sqlite3
 import sys
+from pathlib import Path
+
+
+def _default_db_path() -> str:
+    """Return the platform-specific default DB location."""
+
+    name = "go-search-engine"
+    if sys.platform.startswith("win"):
+        root = os.environ.get("APPDATA") or os.environ.get("LOCALAPPDATA")
+        if root:
+            return str(Path(root) / name / "links.db")
+        return str(Path.home() / "AppData" / "Roaming" / name / "links.db")
+    if sys.platform == "darwin":
+        return str(Path.home() / "Library" / "Application Support" / name / "links.db")
+    return str(Path.home() / ".local" / "share" / name / "links.db")
+
 
 # Use the same default DB location as the app
 try:
     from backend.app.db import DB_PATH, ensure_lists_schema, ensure_search_flag_column  # type: ignore
 except Exception:
     # Fallback to repo-local data folder
-    DB_PATH = os.environ.get(
-        "GO_DB_PATH", os.path.join(os.path.dirname(__file__), "backend", "app", "data", "links.db")
-    )
+    DB_PATH = os.environ.get("GO_DB_PATH", _default_db_path())
 
     def ensure_lists_schema(conn):
         conn.execute("""

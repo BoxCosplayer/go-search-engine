@@ -9,6 +9,29 @@ import init_db
 import pytest
 
 
+def test_init_db_default_path_windows_fallback(monkeypatch, tmp_path):
+    monkeypatch.setattr(init_db.sys, "platform", "win32", raising=False)
+    monkeypatch.delenv("APPDATA", raising=False)
+    monkeypatch.delenv("LOCALAPPDATA", raising=False)
+    monkeypatch.setattr(init_db.Path, "home", lambda: tmp_path)
+    expected = tmp_path / "AppData" / "Roaming" / "go-search-engine" / "links.db"
+    assert init_db._default_db_path() == str(expected)
+
+
+def test_init_db_default_path_darwin(monkeypatch, tmp_path):
+    monkeypatch.setattr(init_db.sys, "platform", "darwin", raising=False)
+    monkeypatch.setattr(init_db.Path, "home", lambda: tmp_path)
+    expected = tmp_path / "Library" / "Application Support" / "go-search-engine" / "links.db"
+    assert init_db._default_db_path() == str(expected)
+
+
+def test_init_db_default_path_linux(monkeypatch, tmp_path):
+    monkeypatch.setattr(init_db.sys, "platform", "linux", raising=False)
+    monkeypatch.setattr(init_db.Path, "home", lambda: tmp_path)
+    expected = tmp_path / ".local" / "share" / "go-search-engine" / "links.db"
+    assert init_db._default_db_path() == str(expected)
+
+
 def test_ensure_schema_creates_links_table(tmp_path):
     db_file = tmp_path / "links.sqlite"
     conn = sqlite3.connect(db_file)

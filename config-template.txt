@@ -2,7 +2,7 @@
     "host": "127.0.0.1",
     "port": 5000,
     "debug": false,
-    "db-path": "links.db",
+    "db-path": "{APPDATA}/go-search-engine/links.db",
     "allow-files": false,
     "fallback-url": "https://duckduckgo.com/?q={q}",
     "file-allow": []

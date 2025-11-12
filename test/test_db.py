@@ -1,4 +1,5 @@
 import sqlite3
+from pathlib import Path
 
 from backend.app.db import close_db, ensure_lists_schema, ensure_search_flag_column, get_db, init_db
 
@@ -7,6 +8,19 @@ def test_get_db_reuses_connection(app_ctx):
     conn1 = get_db()
     conn2 = get_db()
     assert conn1 is conn2
+    close_db(None)
+
+
+def test_get_db_handles_relative_path(app_ctx, monkeypatch, tmp_path):
+    from backend.app import db as db_mod
+
+    close_db(None)
+    relative = Path("relative") / "test.sqlite"
+    monkeypatch.setattr(db_mod, "DB_PATH", str(relative), raising=False)
+    monkeypatch.setattr(db_mod, "BASE_DIR", str(tmp_path), raising=False)
+    conn = get_db()
+    assert (tmp_path / relative).exists()
+    conn.execute("SELECT 1")  # sanity check
     close_db(None)
 
 

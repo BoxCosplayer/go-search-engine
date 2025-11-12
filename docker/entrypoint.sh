@@ -56,8 +56,15 @@ try:
 except (TypeError, ValueError):
     data["port"] = 5000
 
-db_path = data.get("db-path")
-if not db_path or db_path in ("links.db", "data/links.db", "backend/app/data/links.db"):
+db_path = (data.get("db-path") or "").strip()
+normalized = db_path.replace("\\", "/").lower()
+if not db_path or normalized in {
+    "links.db",
+    "data/links.db",
+    "backend/app/data/links.db",
+    "{appdata}/go-search-engine/links.db",
+    "%appdata%/go-search-engine/links.db",
+}:
     data["db-path"] = os.environ["GO_DB_PATH"]
 
 file_allow = data.get("file-allow")

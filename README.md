@@ -16,11 +16,11 @@ This Flask application lets you register memorable keywords, then jump to the ri
 ### Use the latest release (EXE)
 
 1. Download the most recent EXE asset from the project's Releases page.
-2. Move `go-server.exe` into an empty directory (or extract the release archive there) and double-click it from that folder. The app assumes it owns the working directory and will create a `data/` subfolder next to the binary (containing `config.json` and `links.db`) before starting `http://127.0.0.1:5000/`.
-3. Edit `data/config.json` to adjust host, port, or database location, then restart the binary.
+2. Move `go-server.exe` into an empty directory (or extract the release archive there) and double-click it from that folder. The app stores its runtime files under your user profile—`%APPDATA%\go-search-engine` on Windows, `~/Library/Application Support/go-search-engine` on macOS, and `~/.local/share/go-search-engine` on Linux—creating `config.json` and `links.db` there before starting `http://127.0.0.1:5000/`.
+3. Edit the `config.json` file in that profile-specific directory (e.g., `%APPDATA%\go-search-engine\config.json`) to adjust host, port, or database location, then restart the binary.
 4. Browse to `http://127.0.0.1:5000/admin` to add your first shortcuts or lists.
 
-The bundled build writes its SQLite data to `data/links.db` next to the executable (inside the same `data/` folder) unless you override `db-path` in `config.json`.
+By default, the bundled build keeps its SQLite data under the user-specific location above; set `db-path` in `config.json` (absolute or relative) if you prefer a different folder.
 
 ### Run in Docker
 
@@ -98,8 +98,13 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
 # seed config.json on first run
-mkdir -p backend/app/data
-cp config-template.txt backend/app/data/config.json  # Windows: mkdir backend\app\data && copy config-template.txt backend\app\data\config.json
+mkdir -p ~/.local/share/go-search-engine
+cp config-template.txt ~/.local/share/go-search-engine/config.json
+# macOS: mkdir -p "$HOME/Library/Application Support/go-search-engine" && \
+#        cp config-template.txt "$HOME/Library/Application Support/go-search-engine/config.json"
+# Windows (PowerShell):
+#   New-Item -ItemType Directory -Force -Path "$env:APPDATA\go-search-engine"
+#   Copy-Item config-template.txt "$env:APPDATA\go-search-engine\config.json"
 
 # ensure the SQLite schema exists (optional import step described below)
 python init_db.py
@@ -127,14 +132,14 @@ ruff format backend
 
 ## Configuration
 
-Runtime settings live in `data/config.json` (git ignored). The file is created automatically from `config-template.txt` the first time the app boots, or you can copy the template yourself before running. Both the configuration file and the default SQLite database (`data/links.db`) live in the same `data/` directory next to the app/executable so everything stays self-contained.
+Runtime settings live in `config.json` inside the user-specific data directory (`%APPDATA%\go-search-engine` on Windows, `~/Library/Application Support/go-search-engine` on macOS, `~/.local/share/go-search-engine` on Linux). The file is created automatically from `config-template.txt` the first time the app boots, or you can copy the template yourself before running. That same folder also stores the default SQLite database (`links.db`). Override `db-path` with an absolute or relative path if you prefer to keep the database beside the executable or on another volume.
 
 Available keys:
 
 - `host` (str, default `127.0.0.1`): network interface for the Flask server.
 - `port` (int, default `5000`): port to bind.
 - `debug` (bool, default `false`): enables Flask debug mode and reloader.
-- `db-path` (str, default `links.db`): absolute or relative path to the SQLite database.
+- `db-path` (str, default `%APPDATA%\go-search-engine\links.db` / `~/Library/Application Support/go-search-engine/links.db` / `~/.local/share/go-search-engine/links.db`): absolute or relative path to the SQLite database.
 - `allow-files` (bool): allow launching `file://` shortcuts when the target path is in the allow list.
 - `file-allow` (list of strings): absolute directories that local file links may open. Leave empty to block file opens even if `allow-files` is true.
 - `fallback-url` (str, default empty): template used when no shortcut matches; include `{q}` for the URL encoded query.
@@ -205,12 +210,9 @@ backend/
     admin/               # Admin UI blueprint (links, lists, config editor)
     lists/               # List pages blueprint
     templates/           # Jinja templates for UI pages
-    data/
-      config.json        # Runtime config (git ignored, created on first run)
-      links.db           # SQLite data (created on first run/import)
   wsgi.py                # WSGI entry point for production servers
 app.py                   # Compatibility shim that imports backend.app.main
-config-template.txt      # Example config copied into data/config.json when missing
+config-template.txt      # Example config copied into the user data directory when missing
 init_db.py               # CLI helper to initialise/import the database
 requirements.txt         # App dependencies (includes lint/format tooling)
 Dockerfile               # Multi-stage Windows container that runs the PyInstaller exe
@@ -218,6 +220,8 @@ docker/Dockerfile.linux  # Gunicorn-based Linux image that runs the source tree
 docker/entrypoint.sh     # Linux entrypoint that patches config/db paths
 docker/entrypoint.ps1    # Ensures config/db paths exist inside the container
 docker-compose.yml       # Local stack wiring the Linux container + volume
+
+User-specific configuration and SQLite data default to `%APPDATA%\go-search-engine` (Windows), `~/Library/Application Support/go-search-engine` (macOS), or `~/.local/share/go-search-engine` (Linux).
 ```
 
 ## Development workflow
@@ -243,7 +247,7 @@ Or build quickly without the spec (remember to add templates yourself):
 pyinstaller -F -n go-server app.py --add-data "backend/app/templates;backend/app/templates"
 ```
 
-When run from a bundled executable, the app writes the SQLite database under `data/links.db` next to the binary unless overridden via `config.json`.
+When run from a bundled executable, the app writes the SQLite database to the user-specific data directory (`%APPDATA%\go-search-engine\links.db`, etc.) unless overridden via `config.json`.
 
 ## Operational notes
 

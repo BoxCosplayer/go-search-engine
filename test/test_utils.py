@@ -7,6 +7,58 @@ import pytest
 from backend.app import utils
 
 
+@pytest.fixture
+def fake_user_data_dir(tmp_path, monkeypatch):
+    data_dir = tmp_path / "appdata"
+    monkeypatch.setattr(utils, "_user_data_dir", lambda: data_dir)
+    return data_dir
+
+
+@pytest.fixture
+def fake_db_default(fake_user_data_dir, monkeypatch):
+    target = fake_user_data_dir / "links.db"
+    monkeypatch.setattr(utils, "_default_db_path", lambda: target)
+    monkeypatch.setitem(utils._DEFAULT_CONFIG, "db-path", str(target))
+    return target
+
+
+def test_default_db_path_windows_fallback(monkeypatch, tmp_path):
+    monkeypatch.setattr(utils.sys, "platform", "win32", raising=False)
+    monkeypatch.delenv("APPDATA", raising=False)
+    monkeypatch.delenv("LOCALAPPDATA", raising=False)
+    monkeypatch.setattr(utils.Path, "home", lambda: tmp_path)
+    expected = tmp_path / "AppData" / "Roaming" / "go-search-engine" / "links.db"
+    assert utils._default_db_path() == expected
+
+
+def test_default_db_path_darwin(monkeypatch, tmp_path):
+    monkeypatch.setattr(utils.sys, "platform", "darwin", raising=False)
+    monkeypatch.setattr(utils.Path, "home", lambda: tmp_path)
+    expected = tmp_path / "Library" / "Application Support" / "go-search-engine" / "links.db"
+    assert utils._default_db_path() == expected
+
+
+def test_default_db_path_linux(monkeypatch, tmp_path):
+    monkeypatch.setattr(utils.sys, "platform", "linux", raising=False)
+    monkeypatch.setattr(utils.Path, "home", lambda: tmp_path)
+    expected = tmp_path / ".local" / "share" / "go-search-engine" / "links.db"
+    assert utils._default_db_path() == expected
+
+
+def test_legacy_absolute_paths_handles_failures(monkeypatch, tmp_path):
+    def boom(self):
+        if str(self).startswith(str(tmp_path)):
+            raise OSError("fail")
+        return original_resolve(self)
+
+    original_resolve = utils.Path.resolve
+    monkeypatch.setattr(utils, "_project_root", lambda: tmp_path)
+    monkeypatch.setattr(utils.Path, "resolve", boom)
+    assert isinstance(boom(Path(__file__)), Path)
+    result = utils._legacy_absolute_paths()
+    assert isinstance(result, set)
+
+
 def test_sanitize_query_normalizes_quotes_and_trailing_chars():
     assert utils.sanitize_query('"Hello?! "') == "Hello"
     assert utils.sanitize_query("' spaced '") == "spaced"
@@ -108,7 +160,7 @@ def test_open_path_with_os_linux(monkeypatch):
     assert captured == [["xdg-open", "/tmp/demo.txt"]]
 
 
-def test_ensure_config_file_exists_creates_from_template(tmp_path, monkeypatch):
+def test_ensure_config_file_exists_creates_from_template(tmp_path, monkeypatch, fake_db_default):
     cfg = tmp_path / "config.json"
     template = tmp_path / "config-template.txt"
     template.write_text('{"host": "127.0.0.1"}', encoding="utf-8")
@@ -118,12 +170,14 @@ def test_ensure_config_file_exists_creates_from_template(tmp_path, monkeypatch):
 
     monkeypatch.setattr(utils, "_discover_config_path", fake_discover)
     assert utils._ensure_config_file_exists() == cfg
-    assert json.loads(cfg.read_text(encoding="utf-8")) == {"host": "127.0.0.1"}
+    data = json.loads(cfg.read_text(encoding="utf-8"))
+    assert data["host"] == "127.0.0.1"
+    assert data["db-path"] == str(fake_db_default)
 
 
-def test_ensure_config_file_handles_template_oserror(monkeypatch, tmp_path):
-    data_dir = tmp_path / "data"
-    cfg = data_dir / "config.json"
+def test_ensure_config_file_handles_template_oserror(monkeypatch, tmp_path, fake_db_default):
+    cfg_dir = tmp_path / "cfgdir"
+    cfg = cfg_dir / "config.json"
     template = tmp_path / "config-template.txt"
     template.write_text('{"host": "127.0.0.1"}', encoding="utf-8")
 
@@ -140,16 +194,38 @@ def test_ensure_config_file_handles_template_oserror(monkeypatch, tmp_path):
 
     monkeypatch.setattr(utils.Path, "exists", fake_exists)
     created = utils._ensure_config_file_exists()
-    assert json.loads(created.read_text(encoding="utf-8")) == {"host": "127.0.0.1"}
+    data = json.loads(created.read_text(encoding="utf-8"))
+    assert data["host"] == "127.0.0.1"
+    assert data["db-path"] == str(fake_db_default)
 
 
-def test_ensure_config_file_falls_back_to_defaults(monkeypatch, tmp_path):
-    cfg = tmp_path / "data" / "config.json"
+def test_ensure_config_file_falls_back_to_defaults(monkeypatch, tmp_path, fake_db_default):
+    cfg = tmp_path / "cfgdir" / "config.json"
     monkeypatch.setattr(utils, "_discover_config_path", lambda: cfg)
     monkeypatch.setattr(utils, "runtime_base_dir", lambda: tmp_path)
     monkeypatch.setattr(utils, "_project_root", lambda: tmp_path)
     created = utils._ensure_config_file_exists()
     assert json.loads(created.read_text(encoding="utf-8")) == utils._DEFAULT_CONFIG
+
+
+def test_ensure_config_file_respects_custom_db_path(monkeypatch, tmp_path, fake_db_default):
+    cfg = tmp_path / "config.json"
+    template = tmp_path / "config-template.txt"
+    template.write_text('{"db-path": "/custom/location/links.db"}', encoding="utf-8")
+    monkeypatch.setattr(utils, "_discover_config_path", lambda: cfg)
+    created = utils._ensure_config_file_exists()
+    data = json.loads(created.read_text(encoding="utf-8"))
+    assert data["db-path"] == "/custom/location/links.db"
+
+
+def test_ensure_config_file_handles_non_object_template(monkeypatch, tmp_path, fake_db_default):
+    cfg = tmp_path / "config.json"
+    template = tmp_path / "config-template.txt"
+    template.write_text('["not", "an", "object"]', encoding="utf-8")
+    monkeypatch.setattr(utils, "_discover_config_path", lambda: cfg)
+    created = utils._ensure_config_file_exists()
+    data = json.loads(created.read_text(encoding="utf-8"))
+    assert data == utils._DEFAULT_CONFIG
 
 
 def test_discover_config_path_honors_env(monkeypatch, tmp_path):
@@ -159,39 +235,112 @@ def test_discover_config_path_honors_env(monkeypatch, tmp_path):
     assert utils._discover_config_path() == cfg.resolve()
 
 
-def test_discover_config_path_uses_exe_dir_when_frozen(monkeypatch, tmp_path):
+def test_discover_config_path_defaults_to_user_dir(monkeypatch, fake_user_data_dir):
+    monkeypatch.delenv("GO_CONFIG_PATH", raising=False)
+    monkeypatch.setattr(utils, "_legacy_config_candidates", lambda _base: [])
+    expected = fake_user_data_dir / "config.json"
+    assert utils._discover_config_path() == expected.resolve()
+
+
+def test_discover_config_path_uses_user_dir_when_frozen(monkeypatch, fake_user_data_dir, tmp_path):
     exe = tmp_path / "go.exe"
     exe.write_text("")
     monkeypatch.delenv("GO_CONFIG_PATH", raising=False)
     monkeypatch.setattr(utils.sys, "frozen", True, raising=False)
     monkeypatch.setattr(utils.sys, "executable", str(exe), raising=False)
     monkeypatch.setattr(utils, "_legacy_config_candidates", lambda _base: [])
-    expected = exe.parent / "data" / "config.json"
+    expected = fake_user_data_dir / "config.json"
     assert utils._discover_config_path() == expected.resolve()
 
 
-def test_discover_config_path_prefers_data_dir(monkeypatch, tmp_path):
+def test_discover_config_path_prefers_legacy_when_present(monkeypatch, tmp_path, fake_user_data_dir):
     monkeypatch.delenv("GO_CONFIG_PATH", raising=False)
-    monkeypatch.setattr(utils, "runtime_base_dir", lambda: tmp_path)
-    monkeypatch.setattr(utils, "_legacy_config_candidates", lambda _base: [])
-    assert utils._discover_config_path() == (tmp_path / "data" / "config.json")
+    legacy_base = tmp_path / "legacy"
+    legacy_base.mkdir()
+    legacy_cfg = legacy_base / "data" / "config.json"
+    legacy_cfg.parent.mkdir(parents=True, exist_ok=True)
+    legacy_cfg.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(utils, "runtime_base_dir", lambda: legacy_base)
+    target = utils._discover_config_path()
+    assert target == (fake_user_data_dir / "config.json")
+    assert target.exists()
+    assert target.read_text(encoding="utf-8") == legacy_cfg.read_text(encoding="utf-8")
 
 
-def test_discover_config_path_falls_back_to_legacy(monkeypatch, tmp_path):
+def test_discover_config_path_falls_back_when_copy_fails(monkeypatch, tmp_path, fake_user_data_dir):
     monkeypatch.delenv("GO_CONFIG_PATH", raising=False)
-    monkeypatch.setattr(utils, "runtime_base_dir", lambda: tmp_path)
-    legacy = tmp_path / "config.json"
-    legacy.write_text("{}", encoding="utf-8")
-    assert utils._discover_config_path() == legacy.resolve()
+    legacy_base = tmp_path / "legacy"
+    legacy_base.mkdir()
+    legacy_cfg = legacy_base / "config.json"
+    legacy_cfg.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(utils, "runtime_base_dir", lambda: legacy_base)
+    default_cfg = fake_user_data_dir / "config.json"
+    original_write = utils.Path.write_text
+
+    def fake_write(self, *args, **kwargs):
+        if self == default_cfg:
+            raise OSError("boom")
+        return original_write(self, *args, **kwargs)
+
+    monkeypatch.setattr(utils.Path, "write_text", fake_write, raising=False)
+    fake_write(tmp_path / "other.json", "{}", encoding="utf-8")
+    target = utils._discover_config_path()
+    assert target == legacy_cfg.resolve()
 
 
-def test_discover_config_path_returns_existing_data_cfg(monkeypatch, tmp_path):
+def test_discover_config_path_returns_existing_user_config(monkeypatch, fake_user_data_dir):
     monkeypatch.delenv("GO_CONFIG_PATH", raising=False)
-    monkeypatch.setattr(utils, "runtime_base_dir", lambda: tmp_path)
-    data_cfg = tmp_path / "data" / "config.json"
-    data_cfg.parent.mkdir(parents=True, exist_ok=True)
-    data_cfg.write_text("{}", encoding="utf-8")
-    assert utils._discover_config_path() == data_cfg.resolve()
+    cfg = fake_user_data_dir / "config.json"
+    cfg.parent.mkdir(parents=True, exist_ok=True)
+    cfg.write_text("{}", encoding="utf-8")
+    assert utils._discover_config_path() == cfg.resolve()
+
+
+def test_should_replace_db_path_detects_sentinal(tmp_path):
+    cfg_path = tmp_path / "cfgdir" / "config.json"
+    assert utils._should_replace_db_path("links.db", cfg_path) is True
+
+
+def test_should_replace_db_path_detects_absolute_default():
+    legacy = utils._project_root() / "backend" / "app" / "data" / "links.db"
+    assert utils._should_replace_db_path(str(legacy.resolve())) is True
+
+
+def test_should_replace_db_path_absolute_after_resolution():
+    legacy = utils._project_root() / "backend" / "app" / "data" / "links.db"
+    raw = f"{legacy.parent}/../data/links.db"
+    assert utils._should_replace_db_path(raw) is True
+
+
+def test_should_replace_db_path_empty_value(tmp_path):
+    cfg_path = tmp_path / "cfgdir" / "config.json"
+    assert utils._should_replace_db_path("", cfg_path) is True
+
+
+def test_should_replace_db_path_handles_resolve_errors(monkeypatch, tmp_path):
+    original_resolve = utils.Path.resolve
+
+    def fake_resolve(self):
+        if str(self).endswith("boom.db"):
+            raise OSError("boom")
+        return original_resolve(self)
+
+    monkeypatch.setattr(utils.Path, "resolve", fake_resolve)
+    cfg_path = tmp_path / "cfgdir" / "config.json"
+    assert utils._should_replace_db_path("boom.db", cfg_path) is False
+
+
+def test_should_replace_db_path_handles_candidate_resolve_errors(monkeypatch, tmp_path):
+    original_resolve = utils.Path.resolve
+
+    def fake_resolve(self):
+        if self.name == "links.db":
+            raise OSError("fail")
+        return original_resolve(self)
+
+    monkeypatch.setattr(utils.Path, "resolve", fake_resolve)
+    cfg_path = tmp_path / "cfgdir" / "config.json"
+    assert utils._should_replace_db_path("custom/location.db", cfg_path) is False
 
 
 def test_load_config_validates_json(tmp_path, monkeypatch):
@@ -225,13 +374,34 @@ def test_load_config_raises_for_invalid_json(tmp_path, monkeypatch):
         utils.load_config()
 
 
-def test_load_config_missing_file_creates_default(tmp_path, monkeypatch):
+def test_load_config_missing_file_creates_default(tmp_path, monkeypatch, fake_db_default):
     cfg = tmp_path / "config.json"
     monkeypatch.setattr(utils, "_discover_config_path", lambda: cfg)
     created = utils._ensure_config_file_exists()
     assert created.exists()
     data = json.loads(created.read_text(encoding="utf-8"))
-    assert "db-path" in data
+    assert data["db-path"] == str(fake_db_default)
+
+
+def test_load_config_upgrades_legacy_links_db(monkeypatch, tmp_path, fake_db_default):
+    cfg = tmp_path / "config.json"
+    cfg.write_text(
+        json.dumps(
+            {
+                "host": "127.0.0.1",
+                "port": 5000,
+                "debug": False,
+                "db-path": "links.db",
+                "allow-files": False,
+                "fallback-url": "",
+                "file-allow": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(utils, "_discover_config_path", lambda: cfg)
+    loaded = utils.load_config()
+    assert loaded.db_path == str(fake_db_default)
 
 
 def test_to_slug_general_exception(monkeypatch):
@@ -297,7 +467,7 @@ def test_load_config_validation_error(monkeypatch, tmp_path):
 
 
 def test_load_config_normalizes_relative_db_path(monkeypatch, tmp_path):
-    cfg_dir = tmp_path / "data"
+    cfg_dir = tmp_path / "configs"
     cfg_dir.mkdir()
     cfg = cfg_dir / "config.json"
     cfg.write_text(
@@ -306,7 +476,7 @@ def test_load_config_normalizes_relative_db_path(monkeypatch, tmp_path):
                 "host": "127.0.0.1",
                 "port": 5000,
                 "debug": False,
-                "db-path": "links.db",
+                "db-path": "custom.db",
                 "allow-files": False,
                 "fallback-url": "",
                 "file-allow": [],
@@ -316,7 +486,7 @@ def test_load_config_normalizes_relative_db_path(monkeypatch, tmp_path):
     )
     monkeypatch.setattr(utils, "_discover_config_path", lambda: cfg)
     loaded = utils.load_config()
-    assert loaded.db_path == str((cfg_dir / "links.db").resolve())
+    assert loaded.db_path == str((cfg_dir / "custom.db").resolve())
 
 
 def test_normalize_db_path_handles_missing_model_copy(tmp_path):
@@ -324,8 +494,39 @@ def test_normalize_db_path_handles_missing_model_copy(tmp_path):
         def __init__(self, db_path: str):
             self.db_path = db_path
 
-    cfg = DummyConfig("links.db")
-    cfg_path = tmp_path / "data" / "config.json"
+    cfg = DummyConfig("custom.db")
+    cfg_path = tmp_path / "cfgdir" / "config.json"
     normalized = utils._normalize_db_path(cfg, cfg_path)
     assert normalized is cfg
-    assert normalized.db_path == str((cfg_path.parent / "links.db").resolve())
+    assert normalized.db_path == str((cfg_path.parent / "custom.db").resolve())
+
+
+def test_normalize_db_path_upgrades_legacy_value(tmp_path, fake_db_default):
+    cfg = utils.GoConfig(
+        host="127.0.0.1",
+        port=5000,
+        debug=False,
+        db_path="backend/app/data/links.db",
+        allow_files=False,
+        fallback_url="",
+        file_allow=[],
+    )
+    cfg_path = tmp_path / "cfgdir" / "config.json"
+    updated = utils._normalize_db_path(cfg, cfg_path)
+    assert updated.db_path == str(fake_db_default)
+
+
+def test_normalize_db_path_preserves_absolute(tmp_path):
+    dest = tmp_path / "custom" / "links.db"
+    cfg = utils.GoConfig(
+        host="127.0.0.1",
+        port=5000,
+        debug=False,
+        db_path=str(dest),
+        allow_files=False,
+        fallback_url="",
+        file_allow=[],
+    )
+    cfg_path = tmp_path / "cfgdir" / "config.json"
+    updated = utils._normalize_db_path(cfg, cfg_path)
+    assert updated.db_path == str(dest.resolve())
