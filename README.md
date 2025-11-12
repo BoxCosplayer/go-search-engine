@@ -16,7 +16,7 @@ This Flask application lets you register memorable keywords, then jump to the ri
 ### Use the latest release (EXE)
 
 1. Download the most recent EXE asset from the project's Releases page.
-2. Double-click `go-server.exe` Inside a new folder. The app creates `config.json` as well as the `data` folder, then starts on `http://127.0.0.1:5000/`.
+2. Move `go-server.exe` into an empty directory (or extract the release archive there) and double-click it from that folder. The app assumes it owns the working directory and will create `config.json`, `links.db`, and a `data/` subfolder next to the binary before starting `http://127.0.0.1:5000/`.
 3. Edit `config.json` (created next to the executable) to adjust host, port, or database location, then restart the binary.
 4. Browse to `http://127.0.0.1:5000/admin` to add your first shortcuts or lists.
 
@@ -126,7 +126,7 @@ ruff format backend
 
 ## Configuration
 
-Runtime settings live in `config.json` (git ignored). The file is created automatically from `config-template.txt` the first time the app boots, or you can copy the template yourself before running.
+Runtime settings live in `config.json` (git ignored). The file is created automatically from `config-template.txt` the first time the app boots, or you can copy the template yourself before running. When running the standalone executable, `config.json` is created next to the `.exe` on first launch so it lives beside the auto-generated SQLite data.
 
 Available keys:
 

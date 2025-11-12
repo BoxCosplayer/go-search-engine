@@ -128,6 +128,16 @@ def test_discover_config_path_honors_env(monkeypatch, tmp_path):
     assert utils._discover_config_path() == cfg.resolve()
 
 
+def test_discover_config_path_uses_exe_dir_when_frozen(monkeypatch, tmp_path):
+    exe = tmp_path / "go.exe"
+    exe.write_text("")
+    monkeypatch.delenv("GO_CONFIG_PATH", raising=False)
+    monkeypatch.setattr(utils.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(utils.sys, "executable", str(exe), raising=False)
+    expected = exe.parent / "config.json"
+    assert utils._discover_config_path() == expected.resolve()
+
+
 def test_load_config_validates_json(tmp_path, monkeypatch):
     cfg = tmp_path / "config.json"
     cfg.write_text(

@@ -2,6 +2,11 @@
 
 ## [Major Versions Log](#major-versions-log)
 
+
+## 1.1.6
+
+- Fixed the bundled executable so it now creates `config.json` next to the `.exe` (matching the colocated SQLite database) when no config file exists.
+
 ## 1.1.5
 
 - Updated the docker documentation
@@ -32,6 +37,7 @@
 ## 1.0.0
 
 - Fully reworked documentation
+
 
 
 ## 0.5.2

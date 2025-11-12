@@ -151,7 +151,12 @@ def _discover_config_path() -> Path:
     override = os.environ.get("GO_CONFIG_PATH")
     if override:
         return Path(override).expanduser()
-    return Path(__file__).resolve().parents[2] / "config.json"
+    if getattr(sys, "frozen", False):
+        exe_path = Path(getattr(sys, "executable", __file__)).resolve()
+        base_dir = exe_path.parent
+    else:
+        base_dir = Path(__file__).resolve().parents[2]
+    return base_dir / "config.json"
 
 
 def _ensure_config_file_exists() -> Path:
