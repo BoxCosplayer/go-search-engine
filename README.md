@@ -16,11 +16,11 @@ This Flask application lets you register memorable keywords, then jump to the ri
 ### Use the latest release (EXE)
 
 1. Download the most recent EXE asset from the project's Releases page.
-2. Move `go-server.exe` into an empty directory (or extract the release archive there) and double-click it from that folder. The app assumes it owns the working directory and will create `config.json`, `links.db`, and a `data/` subfolder next to the binary before starting `http://127.0.0.1:5000/`.
-3. Edit `config.json` (created next to the executable) to adjust host, port, or database location, then restart the binary.
+2. Move `go-server.exe` into an empty directory (or extract the release archive there) and double-click it from that folder. The app assumes it owns the working directory and will create a `data/` subfolder next to the binary (containing `config.json` and `links.db`) before starting `http://127.0.0.1:5000/`.
+3. Edit `data/config.json` to adjust host, port, or database location, then restart the binary.
 4. Browse to `http://127.0.0.1:5000/admin` to add your first shortcuts or lists.
 
-The bundled build writes its SQLite data to `links.db` in the same directory as the executable unless you override `db-path` in `config.json`.
+The bundled build writes its SQLite data to `data/links.db` next to the executable (inside the same `data/` folder) unless you override `db-path` in `config.json`.
 
 ### Run in Docker
 
@@ -98,7 +98,8 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
 # seed config.json on first run
-cp config-template.txt config.json  # Windows: copy config-template.txt config.json
+mkdir -p backend/app/data
+cp config-template.txt backend/app/data/config.json  # Windows: mkdir backend\app\data && copy config-template.txt backend\app\data\config.json
 
 # ensure the SQLite schema exists (optional import step described below)
 python init_db.py
@@ -126,7 +127,7 @@ ruff format backend
 
 ## Configuration
 
-Runtime settings live in `config.json` (git ignored). The file is created automatically from `config-template.txt` the first time the app boots, or you can copy the template yourself before running. When running the standalone executable, `config.json` is created next to the `.exe` on first launch so it lives beside the auto-generated SQLite data.
+Runtime settings live in `data/config.json` (git ignored). The file is created automatically from `config-template.txt` the first time the app boots, or you can copy the template yourself before running. Both the configuration file and the default SQLite database (`data/links.db`) live in the same `data/` directory next to the app/executable so everything stays self-contained.
 
 Available keys:
 
@@ -204,11 +205,12 @@ backend/
     admin/               # Admin UI blueprint (links, lists, config editor)
     lists/               # List pages blueprint
     templates/           # Jinja templates for UI pages
-    data/links.db        # SQLite data (created on first run/import)
+    data/
+      config.json        # Runtime config (git ignored, created on first run)
+      links.db           # SQLite data (created on first run/import)
   wsgi.py                # WSGI entry point for production servers
 app.py                   # Compatibility shim that imports backend.app.main
-config-template.txt      # Example config copied when config.json is missing
-config.json              # Runtime config (git ignored)
+config-template.txt      # Example config copied into data/config.json when missing
 init_db.py               # CLI helper to initialise/import the database
 requirements.txt         # App dependencies (includes lint/format tooling)
 Dockerfile               # Multi-stage Windows container that runs the PyInstaller exe

@@ -1,6 +1,7 @@
 import os
 import sqlite3
 import sys
+from pathlib import Path
 
 from flask import g
 
@@ -37,7 +38,9 @@ def get_db():
     """
     if "db" not in g:
         os.makedirs(os.path.join(BASE_DIR, "data"), exist_ok=True)
-        g.db = sqlite3.connect(DB_PATH)
+        db_file = Path(DB_PATH)
+        db_file.parent.mkdir(parents=True, exist_ok=True)
+        g.db = sqlite3.connect(str(db_file))
         g.db.row_factory = sqlite3.Row
         g.db.execute("PRAGMA foreign_keys = ON")
     return g.db

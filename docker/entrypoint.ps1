@@ -65,7 +65,12 @@ function Initialize-Config {
     if (-not $json.port -or $json.port -eq 0) {
         $json.port = [int]$env:GO_PORT
     }
-    if (-not $json.'db-path' -or $json.'db-path' -eq 'backend/app/data/links.db' -or $json.'db-path' -eq 'links.db') {
+    if (
+        -not $json.'db-path' -or
+        $json.'db-path' -eq 'backend/app/data/links.db' -or
+        $json.'db-path' -eq 'data/links.db' -or
+        $json.'db-path' -eq 'links.db'
+    ) {
         $json.'db-path' = $env:GO_DB_PATH
     }
     if (-not $json.'file-allow') {

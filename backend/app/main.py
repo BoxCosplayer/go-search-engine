@@ -12,7 +12,9 @@ import xml.etree.ElementTree as ET
 from functools import lru_cache
 from html.parser import HTMLParser
 from io import StringIO
+from pathlib import Path
 from urllib.parse import quote_plus, urljoin, urlparse
+from pathlib import Path
 
 import httpx
 
@@ -752,6 +754,7 @@ def opensearch_suggest():
 if __name__ == "__main__":  # pragma: no cover
     base_dir = os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else os.path.dirname(__file__)
     os.makedirs(os.path.join(base_dir, "data"), exist_ok=True)
+    Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(DB_PATH) as db:
         db.execute("""
         CREATE TABLE IF NOT EXISTS links (

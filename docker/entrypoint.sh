@@ -57,7 +57,7 @@ except (TypeError, ValueError):
     data["port"] = 5000
 
 db_path = data.get("db-path")
-if not db_path or db_path in ("backend/app/data/links.db", "links.db"):
+if not db_path or db_path in ("links.db", "data/links.db", "backend/app/data/links.db"):
     data["db-path"] = os.environ["GO_DB_PATH"]
 
 file_allow = data.get("file-allow")

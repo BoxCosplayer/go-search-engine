@@ -29,11 +29,24 @@ try:
 except ImportError:  # pragma: no cover
     slugify = None  # type: ignore
 
+def runtime_base_dir() -> Path:
+    """Return the folder where runtime artifacts should live."""
+    if getattr(sys, "frozen", False):
+        exe = Path(getattr(sys, "executable", __file__)).resolve()
+        return exe.parent
+    return Path(__file__).resolve().parent
+
+
+def _project_root() -> Path:
+    """Best-effort project root for dev environments."""
+    return Path(__file__).resolve().parents[2]
+
+
 _DEFAULT_CONFIG = {
     "host": "127.0.0.1",
     "port": 5000,
     "debug": False,
-    "db-path": "backend/app/data/links.db",
+    "db-path": "links.db",
     "allow-files": True,
     "fallback-url": "",
     "file-allow": [],
@@ -131,7 +144,7 @@ class GoConfig(BaseModel):
     host: str = "127.0.0.1"
     port: int = 5000
     debug: bool = False
-    db_path: str = Field("backend/app/data/links.db", alias="db-path")
+    db_path: str = Field("links.db", alias="db-path")
     allow_files: bool = Field(False, alias="allow-files")
     fallback_url: str = Field("", alias="fallback-url")
     file_allow: list[str] = Field(default_factory=list, alias="file-allow")
@@ -146,17 +159,35 @@ class GoConfig(BaseModel):
             extra = "ignore"  # pragma: no cover
 
 
+def _default_config_path(base_dir: Path) -> Path:
+    return base_dir / "data" / "config.json"
+
+
+def _legacy_config_candidates(base_dir: Path) -> list[Path]:
+    """Return historical config paths that should remain readable."""
+    return [
+        base_dir / "config.json",
+        base_dir.parent / "config.json",
+        _project_root() / "config.json",
+    ]
+
+
 def _discover_config_path() -> Path:
     """Return absolute path to config.json, honoring GO_CONFIG_PATH overrides."""
     override = os.environ.get("GO_CONFIG_PATH")
     if override:
         return Path(override).expanduser()
-    if getattr(sys, "frozen", False):
-        exe_path = Path(getattr(sys, "executable", __file__)).resolve()
-        base_dir = exe_path.parent
-    else:
-        base_dir = Path(__file__).resolve().parents[2]
-    return base_dir / "config.json"
+
+    base_dir = runtime_base_dir()
+    data_cfg = _default_config_path(base_dir)
+    if data_cfg.exists():
+        return data_cfg
+
+    for candidate in _legacy_config_candidates(base_dir):
+        if candidate.exists():
+            return candidate
+
+    return data_cfg
 
 
 def _ensure_config_file_exists() -> Path:
@@ -166,16 +197,42 @@ def _ensure_config_file_exists() -> Path:
     if cfg_path.exists():
         return cfg_path
 
-    template_path = cfg_path.with_name("config-template.txt")
+    cfg_path.parent.mkdir(parents=True, exist_ok=True)
+    template_candidates = [
+        cfg_path.with_name("config-template.txt"),
+        runtime_base_dir() / "config-template.txt",
+        _project_root() / "config-template.txt",
+    ]
+    contents = None
+    for tpl in template_candidates:
+        try:
+            if tpl.exists():
+                contents = tpl.read_text(encoding="utf-8")
+                break
+        except OSError:
+            continue
+    if contents is None:
+        contents = json.dumps(_DEFAULT_CONFIG, indent=4) + "\n"
     try:
-        if template_path.exists():
-            contents = template_path.read_text(encoding="utf-8")
-        else:
-            contents = json.dumps(_DEFAULT_CONFIG, indent=4) + "\n"
         cfg_path.write_text(contents, encoding="utf-8")
     except OSError as exc:  # pragma: no cover - filesystem guard
         raise OSError(f"Failed to create default config: {exc}") from exc
     return cfg_path
+
+
+def _normalize_db_path(cfg: GoConfig, cfg_path: Path) -> GoConfig:
+    """Ensure db_path is absolute, rooting relative paths next to config."""
+
+    raw = Path(cfg.db_path).expanduser()
+    if not raw.is_absolute():
+        raw = (cfg_path.parent / raw).resolve()
+    else:
+        raw = raw.resolve()
+    updated = str(raw)
+    if hasattr(cfg, "model_copy"):
+        return cfg.model_copy(update={"db_path": updated})  # type: ignore[attr-defined]
+    cfg.db_path = updated  # type: ignore[attr-defined]
+    return cfg
 
 
 def load_config() -> GoConfig:
@@ -188,9 +245,10 @@ def load_config() -> GoConfig:
     except json.JSONDecodeError as e:
         raise ValueError(f"Invalid JSON in {cfg_path}: {e}") from e
     try:
-        return GoConfig(**data)
+        loaded = GoConfig(**data)
     except ValidationError as e:
         raise ValueError(f"Invalid configuration: {e}") from e
+    return _normalize_db_path(loaded, cfg_path)
 
 
 # Importable, validated configuration object
