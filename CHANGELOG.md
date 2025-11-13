@@ -8,6 +8,7 @@
 - Fixed the bundled executable so it now creates all external files (config.json and links.db) in the users appdata folder
 - Updated docs and all helper functions to default to the new location
 - Removed ability to change where db lives
+- Set debug defaults
 
 ## 1.1.5
 
