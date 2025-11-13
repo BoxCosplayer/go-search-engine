@@ -31,7 +31,6 @@ def test_admin_config_get_and_post(client):
         "host": "127.0.0.1",
         "port": "6000",
         "debug": "on",
-        "db_path": "db.sqlite",
         "allow_files": "on",
         "fallback_url": "https://duck.example/?q={q}",
         "file_allow": "/data\n/tmp",
@@ -44,6 +43,7 @@ def test_admin_config_get_and_post(client):
     assert blob["debug"] is True
     assert blob["port"] == 6000
     assert blob["file-allow"] == ["/data", "/tmp"]
+    assert "db-path" not in blob
 
 
 def test_admin_module_reexports(monkeypatch, tmp_path):

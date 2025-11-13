@@ -29,7 +29,6 @@ ensure_config_file() {
   "host": "127.0.0.1",
   "port": 5000,
   "debug": false,
-  "db-path": "/data/links.db",
   "allow-files": false,
   "fallback-url": "",
   "file-allow": []
@@ -56,20 +55,12 @@ try:
 except (TypeError, ValueError):
     data["port"] = 5000
 
-db_path = (data.get("db-path") or "").strip()
-normalized = db_path.replace("\\", "/").lower()
-if not db_path or normalized in {
-    "links.db",
-    "data/links.db",
-    "backend/app/data/links.db",
-    "{appdata}/go-search-engine/links.db",
-    "%appdata%/go-search-engine/links.db",
-}:
-    data["db-path"] = os.environ["GO_DB_PATH"]
-
 file_allow = data.get("file-allow")
 if not isinstance(file_allow, list):
     data["file-allow"] = []
+
+data.pop("db-path", None)
+data.pop("db_path", None)
 
 config_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 PY

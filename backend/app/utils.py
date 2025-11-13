@@ -68,40 +68,24 @@ def _default_config_path() -> Path:
     return _user_data_dir() / "config.json"
 
 
-def _normalize_db_token(value: str) -> str:
-    return value.replace("\\", "/").strip().lower()
-
-
-def _legacy_absolute_paths() -> set[str]:
-    """Return normalized absolute paths for historical defaults."""
-    roots = set()
-    candidates = [
-        _project_root() / "backend" / "app" / "data" / "links.db",
-        _project_root() / "data" / "links.db",
-    ]
-    for candidate in candidates:
+def get_db_path() -> Path:
+    """Return the runtime database path, honoring GO_DB_PATH overrides."""
+    override = os.environ.get("GO_DB_PATH")
+    if override:
+        candidate = Path(override).expanduser()
+        if not candidate.is_absolute():
+            candidate = runtime_base_dir() / candidate
         try:
-            roots.add(_normalize_db_token(str(candidate.resolve())))
-        except OSError:
-            roots.add(_normalize_db_token(str(candidate)))
-    return roots
-
-
-_LEGACY_DB_SENTINELS = {
-    "links.db",
-    "data/links.db",
-    "backend/app/data/links.db",
-    "{appdata}/go-search-engine/links.db",
-    "%appdata%/go-search-engine/links.db",
-}
-_LEGACY_DB_ABSOLUTE_SENTINELS = _legacy_absolute_paths()
+            return candidate.resolve()
+        except OSError:  # pragma: no cover - resolve can fail if drive missing
+            return candidate
+    return _default_db_path()
 
 
 _DEFAULT_CONFIG = {
     "host": "127.0.0.1",
     "port": 5000,
     "debug": False,
-    "db-path": str(_default_db_path()),
     "allow-files": True,
     "fallback-url": "",
     "file-allow": [],
@@ -199,7 +183,6 @@ class GoConfig(BaseModel):
     host: str = "127.0.0.1"
     port: int = 5000
     debug: bool = False
-    db_path: str = Field("links.db", alias="db-path")
     allow_files: bool = Field(False, alias="allow-files")
     fallback_url: str = Field("", alias="fallback-url")
     file_allow: list[str] = Field(default_factory=list, alias="file-allow")
@@ -222,39 +205,6 @@ def _legacy_config_candidates(base_dir: Path) -> list[Path]:
         base_dir.parent / "config.json",
         _project_root() / "config.json",
     ]
-
-
-def _should_replace_db_path(raw: str, cfg_path: Path | None = None) -> bool:
-    """Return True when db-path should be upgraded to the AppData default."""
-
-    if not raw:
-        return True
-
-    normalized = _normalize_db_token(str(raw))
-    if normalized in _LEGACY_DB_SENTINELS or normalized in _LEGACY_DB_ABSOLUTE_SENTINELS:
-        return True
-
-    try:
-        absolute_norm = _normalize_db_token(str(Path(raw).expanduser().resolve()))
-    except OSError:
-        absolute_norm = ""
-    if absolute_norm in _LEGACY_DB_ABSOLUTE_SENTINELS:
-        return True
-
-    if cfg_path is not None:
-        candidates = [
-            cfg_path.parent / "links.db",
-            cfg_path.parent / "data" / "links.db",
-        ]
-        for candidate in candidates:
-            try:
-                cand_norm = _normalize_db_token(str(candidate.resolve()))
-            except OSError:
-                cand_norm = _normalize_db_token(str(candidate))
-            if normalized == cand_norm or absolute_norm == cand_norm:
-                return True
-
-    return False
 
 
 def _discover_config_path() -> Path:
@@ -317,9 +267,12 @@ def _ensure_config_file_exists() -> Path:
         data = dict(_DEFAULT_CONFIG)
         data.update(parsed)
 
-    current_db_path = str(data.get("db-path", "")).strip()
-    if _should_replace_db_path(current_db_path, cfg_path):
-        data["db-path"] = str(_default_db_path())
+    # Force debug to remain disabled in freshly generated configs.
+    data["debug"] = False
+
+    # Drop legacy db-path entries so newly generated configs don't expose it.
+    data.pop("db-path", None)
+    data.pop("db_path", None)
 
     payload = json.dumps(data, indent=4) + "\n"
     try:
@@ -327,23 +280,6 @@ def _ensure_config_file_exists() -> Path:
     except OSError as exc:  # pragma: no cover - filesystem guard
         raise OSError(f"Failed to create default config: {exc}") from exc
     return cfg_path
-
-
-def _normalize_db_path(cfg: GoConfig, cfg_path: Path) -> GoConfig:
-    """Ensure db_path is absolute, rooting relative paths next to config."""
-
-    db_value = str(cfg.db_path)
-    if _should_replace_db_path(db_value, cfg_path):
-        raw = _default_db_path()
-    else:
-        raw_path = Path(db_value).expanduser()
-        raw = (cfg_path.parent / raw_path).resolve() if not raw_path.is_absolute() else raw_path.resolve()
-
-    updated = str(raw)
-    if hasattr(cfg, "model_copy"):
-        return cfg.model_copy(update={"db_path": updated})  # type: ignore[attr-defined]
-    cfg.db_path = updated  # type: ignore[attr-defined]
-    return cfg
 
 
 def load_config() -> GoConfig:
@@ -359,7 +295,7 @@ def load_config() -> GoConfig:
         loaded = GoConfig(**data)
     except ValidationError as e:
         raise ValueError(f"Invalid configuration: {e}") from e
-    return _normalize_db_path(loaded, cfg_path)
+    return loaded
 
 
 # Importable, validated configuration object

@@ -34,7 +34,6 @@ function Initialize-Config {
             host           = '127.0.0.1'
             port           = 5000
             debug          = $false
-            'db-path'      = 'C:\data\links.db'
             'allow-files'  = $false
             'fallback-url' = ''
             'file-allow'   = @()
@@ -52,7 +51,6 @@ function Initialize-Config {
             host           = '127.0.0.1'
             port           = 5000
             debug          = $false
-            'db-path'      = 'C:\data\links.db'
             'allow-files'  = $false
             'fallback-url' = ''
             'file-allow'   = @()
@@ -65,35 +63,24 @@ function Initialize-Config {
     if (-not $json.port -or $json.port -eq 0) {
         $json.port = [int]$env:GO_PORT
     }
-    if (
-        -not $json.'db-path' -or
-        $json.'db-path' -eq 'backend/app/data/links.db' -or
-        $json.'db-path' -eq 'data/links.db' -or
-        $json.'db-path' -eq 'links.db' -or
-        $json.'db-path' -eq '{APPDATA}/go-search-engine/links.db' -or
-        $json.'db-path' -eq '%APPDATA%/go-search-engine/links.db'
-    ) {
-        $json.'db-path' = $env:GO_DB_PATH
-    }
     if (-not $json.'file-allow') {
         $json.'file-allow' = @()
+    }
+
+    if ($json.PSObject.Properties['db-path']) {
+        $null = $json.PSObject.Properties.Remove('db-path')
+    }
+    if ($json.PSObject.Properties['db_path']) {
+        $null = $json.PSObject.Properties.Remove('db_path')
     }
 
     $json | ConvertTo-Json -Depth 6 | Set-Content -Path $ConfigPath -Encoding utf8NoBOM
 }
 
 function Initialize-DbDirectory {
-    param([string]$ConfigPath)
-    try {
-        $cfg = Get-Content -Path $ConfigPath -Raw | ConvertFrom-Json
-        $dbPath = if ($cfg.'db-path') { $cfg.'db-path' } else { 'C:\data\links.db' }
-    }
-    catch {
-        Write-Warning "Unable to parse $ConfigPath for db-path. Falling back to C:\data\links.db. $_"
-        $dbPath = 'C:\data\links.db'
-    }
+    param([string]$DbPath)
 
-    $dbDir = Split-Path -Path $dbPath -Parent
+    $dbDir = Split-Path -Path $DbPath -Parent
     if ($dbDir -and -not (Test-Path -Path $dbDir)) {
         New-Item -Path $dbDir -ItemType Directory -Force | Out-Null
     }
@@ -122,11 +109,6 @@ function Update-ConfigFromEnv {
             $writeBack = $true
         }
     }
-    if ($env:GO_DB_PATH -and $cfg.'db-path' -ne $env:GO_DB_PATH) {
-        $cfg.'db-path' = $env:GO_DB_PATH
-        $writeBack = $true
-    }
-
     if ($writeBack) {
         $cfg | ConvertTo-Json -Depth 6 | Set-Content -Path $ConfigPath -Encoding utf8NoBOM
     }
@@ -141,7 +123,7 @@ if (-not $configPath) {
 $templateSource = Join-Path -Path 'C:\app' -ChildPath 'config-template.txt'
 Initialize-Config -ConfigPath $configPath -TemplateSource $templateSource
 Update-ConfigFromEnv -ConfigPath $configPath
-Initialize-DbDirectory -ConfigPath $configPath
+Initialize-DbDirectory -DbPath $env:GO_DB_PATH
 
 if (-not (Test-Path -Path $Executable)) {
     throw "Executable not found at $Executable"

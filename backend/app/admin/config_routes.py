@@ -13,7 +13,6 @@ def _config_to_form_data(cfg: GoConfig) -> dict[str, object]:
         "host": cfg.host,
         "port": cfg.port,
         "debug": cfg.debug,
-        "db_path": cfg.db_path,
         "allow_files": cfg.allow_files,
         "fallback_url": cfg.fallback_url,
         "file_allow": "\n".join(cfg.file_allow),
@@ -33,11 +32,11 @@ def admin_config():
     form_values = _config_to_form_data(current_cfg)
     message = ""
     save_error = ""
+    current_db_path = str(utils.get_db_path())
 
     if request.method == "POST":
         host = (request.form.get("host") or "").strip()
         port_raw = (request.form.get("port") or "").strip()
-        db_path = (request.form.get("db_path") or "").strip()
         fallback_url = (request.form.get("fallback_url") or "").strip()
         file_allow_raw = request.form.get("file_allow") or ""
         file_allow_list = [line.strip() for line in file_allow_raw.splitlines() if line.strip()]
@@ -46,7 +45,6 @@ def admin_config():
             "host": host or current_cfg.host,
             "port": port_raw or current_cfg.port,
             "debug": "debug" in request.form,
-            "db_path": db_path or current_cfg.db_path,
             "allow_files": "allow_files" in request.form,
             "fallback_url": fallback_url,
             "file_allow": file_allow_raw,
@@ -56,7 +54,6 @@ def admin_config():
             "host": form_values["host"],
             "port": form_values["port"],
             "debug": form_values["debug"],
-            "db_path": form_values["db_path"],
             "allow_files": form_values["allow_files"],
             "fallback_url": form_values["fallback_url"],
             "file_allow": file_allow_list,
@@ -77,6 +74,7 @@ def admin_config():
             form_values = _config_to_form_data(new_cfg)
             load_error = ""
             message = "Configuration saved."
+            current_db_path = str(utils.get_db_path())
 
     return render_template(
         "admin/config.html",
@@ -84,4 +82,5 @@ def admin_config():
         load_error=load_error,
         save_error=save_error,
         message=message,
+        db_path=current_db_path,
     )

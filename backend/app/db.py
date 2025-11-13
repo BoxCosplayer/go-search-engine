@@ -5,7 +5,7 @@ from pathlib import Path
 
 from flask import g
 
-from .utils import config
+from .utils import get_db_path
 
 
 def _base_dir() -> str:
@@ -22,7 +22,7 @@ def _base_dir() -> str:
 
 BASE_DIR = _base_dir()
 
-DB_PATH = config.db_path
+DB_PATH = str(get_db_path())
 
 
 def get_db():

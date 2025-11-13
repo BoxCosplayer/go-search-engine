@@ -13,7 +13,6 @@ def prepare_test_config(monkeypatch, tmp_path):
         "host": "127.0.0.1",
         "port": 5001,
         "debug": True,
-        "db-path": str(db_file),
         "allow-files": True,
         "fallback-url": "https://search.example/?q={q}",
         "file-allow": [str(tmp_path)],
@@ -22,6 +21,7 @@ def prepare_test_config(monkeypatch, tmp_path):
 
     config_obj = utils.GoConfig(**cfg_data)
     config_obj._config_path = cfg_file  # convenience for tests
+    config_obj._db_path = str(db_file)
 
     # Patch utils module state
     monkeypatch.setattr(utils, "config", config_obj, raising=False)
@@ -31,7 +31,7 @@ def prepare_test_config(monkeypatch, tmp_path):
     from backend.app import db as db_mod
 
     monkeypatch.setattr(db_mod, "config", config_obj, raising=False)
-    monkeypatch.setattr(db_mod, "DB_PATH", config_obj.db_path, raising=False)
+    monkeypatch.setattr(db_mod, "DB_PATH", config_obj._db_path, raising=False)
     monkeypatch.setattr(db_mod, "BASE_DIR", str(tmp_path), raising=False)
 
     # Patch main module globals
@@ -89,7 +89,7 @@ def client(app_ctx):
 @pytest.fixture()
 def db_conn(test_config):
     """Direct sqlite3 connection to the isolated database."""
-    conn = sqlite3.connect(test_config.db_path)
+    conn = sqlite3.connect(test_config._db_path)
     conn.row_factory = sqlite3.Row
     yield conn
     conn.close()

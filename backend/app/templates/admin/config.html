@@ -247,10 +247,10 @@
           <label for="allow_files">Allow opening local file paths</label>
         </div>
 
-        <label for="db_path">Database path
-          <input id="db_path" name="db_path" type="text" value="{{ form.db_path }}" required>
-          <span>Absolute or product-relative path to the SQLite database file.</span>
-        </label>
+        <div class="flash notice">
+          <strong>Database location</strong><br>
+          Stored at <code>{{ db_path }}</code>. Set the <code>GO_DB_PATH</code> environment variable before starting the server if you need to move it.
+        </div>
 
         <label for="fallback_url">Fallback search URL
           <input id="fallback_url" name="fallback_url" type="text" value="{{ form.fallback_url }}"

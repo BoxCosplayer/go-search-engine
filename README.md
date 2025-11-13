@@ -17,10 +17,10 @@ This Flask application lets you register memorable keywords, then jump to the ri
 
 1. Download the most recent EXE asset from the project's Releases page.
 2. Move `go-server.exe` into an empty directory (or extract the release archive there) and double-click it from that folder. The app stores its runtime files under your user profile—`%APPDATA%\go-search-engine` on Windows, `~/Library/Application Support/go-search-engine` on macOS, and `~/.local/share/go-search-engine` on Linux—creating `config.json` and `links.db` there before starting `http://127.0.0.1:5000/`.
-3. Edit the `config.json` file in that profile-specific directory (e.g., `%APPDATA%\go-search-engine\config.json`) to adjust host, port, or database location, then restart the binary.
+3. Edit the `config.json` file in that profile-specific directory (e.g., `%APPDATA%\go-search-engine\config.json`) to adjust host, port, or other runtime settings, then restart the binary.
 4. Browse to `http://127.0.0.1:5000/admin` to add your first shortcuts or lists.
 
-By default, the bundled build keeps its SQLite data under the user-specific location above; set `db-path` in `config.json` (absolute or relative) if you prefer a different folder.
+By default, the bundled build keeps its SQLite data under the user-specific location above. Set the `GO_DB_PATH` environment variable before launching the app if you need to relocate `links.db`; the admin UI and `config.json` no longer expose a knob for it.
 
 ### Run in Docker
 
@@ -34,7 +34,7 @@ By default, the bundled build keeps its SQLite data under the user-specific loca
    ```bash
    docker run --rm -p 5000:5000 -v go-data:/data ghcr.io/boxcosplayer/go-server:latest
    ```
-3. The Bash entrypoint copies `config-template.txt` into `/data/config.json` on first start, rewrites `host`, `port`, and `db-path` when needed, and then boots Gunicorn via `backend.wsgi:application`.
+3. The Bash entrypoint copies `config-template.txt` into `/data/config.json` on first start, rewrites `host`/`port` when needed, exports `GO_DB_PATH` (default `/data/links.db`) for the server, and then boots Gunicorn via `backend.wsgi:application`.
 
 Need a different listener? The container now defaults to `GO_HOST=127.0.0.1` / `GO_PORT=5000`, so `docker run` works without extra flags. Override them by passing matching `-e` switches and publishing the same port, e.g.:
 
@@ -59,7 +59,7 @@ Environment variables accepted by Linux (Gunicorn) containers:
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `GO_CONFIG_PATH` | `/data/config.json` (Linux) / `C:\data\config.json` (Windows) | Location of the runtime config file. |
-| `GO_DB_PATH` | `/data/links.db` / `C:\data\links.db` | SQLite destination written into `config.json`. |
+| `GO_DB_PATH` | `/data/links.db` / `C:\data\links.db` | SQLite destination the server uses; set before start to relocate `links.db`. |
 | `GO_HOST` | `127.0.0.1` | Interface the server binds to inside the container. |
 | `GO_PORT` | `5000` | In-container TCP port; match the host mapping when overriding. |
 | `GO_GUNICORN_WORKERS` | `2` | Worker processes for Gunicorn. |
@@ -85,7 +85,7 @@ Mount existing config/database files in the same way as before; the PowerShell e
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `GO_CONFIG_PATH` | `C:\data\config.json` | Location of the runtime config file. |
-| `GO_DB_PATH` | `C:\data\links.db` | SQLite destination written into `config.json`. |
+| `GO_DB_PATH` | `C:\data\links.db` | SQLite destination the server uses; set before start to relocate `links.db`. |
 | `GO_HOST` | `127.0.0.1` | Interface the server binds to inside the container. |
 | `GO_PORT` | `5000` | In-container TCP port; match the host mapping when overriding. |
 
@@ -113,7 +113,7 @@ python init_db.py
 python app.py
 ```
 
-The development server binds to the `host` and `port` defined in `config.json` (defaults to `127.0.0.1:5000`) and stores data at the configured `db-path`.
+The development server binds to the `host` and `port` defined in `config.json` (defaults to `127.0.0.1:5000`) and stores data under the user-specific data directory unless `GO_DB_PATH` is set before launch.
 
 Run the tests before shipping changes:
 
@@ -132,19 +132,18 @@ ruff format backend
 
 ## Configuration
 
-Runtime settings live in `config.json` inside the user-specific data directory (`%APPDATA%\go-search-engine` on Windows, `~/Library/Application Support/go-search-engine` on macOS, `~/.local/share/go-search-engine` on Linux). The file is created automatically from `config-template.txt` the first time the app boots, or you can copy the template yourself before running. That same folder also stores the default SQLite database (`links.db`). Override `db-path` with an absolute or relative path if you prefer to keep the database beside the executable or on another volume.
+Runtime settings live in `config.json` inside the user-specific data directory (`%APPDATA%\go-search-engine` on Windows, `~/Library/Application Support/go-search-engine` on macOS, `~/.local/share/go-search-engine` on Linux). The file is created automatically from `config-template.txt` the first time the app boots, or you can copy the template yourself before running. That same folder also stores the default SQLite database (`links.db`). Set the `GO_DB_PATH` environment variable before launching if you need to keep the database beside the executable or on another volume; the config file no longer exposes this toggle.
 
 Available keys:
 
 - `host` (str, default `127.0.0.1`): network interface for the Flask server.
 - `port` (int, default `5000`): port to bind.
 - `debug` (bool, default `false`): enables Flask debug mode and reloader.
-- `db-path` (str, default `%APPDATA%\go-search-engine\links.db` / `~/Library/Application Support/go-search-engine/links.db` / `~/.local/share/go-search-engine/links.db`): absolute or relative path to the SQLite database.
 - `allow-files` (bool): allow launching `file://` shortcuts when the target path is in the allow list.
 - `file-allow` (list of strings): absolute directories that local file links may open. Leave empty to block file opens even if `allow-files` is true.
 - `fallback-url` (str, default empty): template used when no shortcut matches; include `{q}` for the URL encoded query.
 
-Override the location of `config.json` by setting the `GO_CONFIG_PATH` environment variable before starting the server. The admin Config page at `/admin/config` also edits and saves these values with validation.
+Override the location of `config.json` by setting the `GO_CONFIG_PATH` environment variable before starting the server. Use `GO_DB_PATH` for the SQLite location. The admin Config page at `/admin/config` edits and saves these values with validation.
 
 ## Using go
 
@@ -247,7 +246,7 @@ Or build quickly without the spec (remember to add templates yourself):
 pyinstaller -F -n go-server app.py --add-data "backend/app/templates;backend/app/templates"
 ```
 
-When run from a bundled executable, the app writes the SQLite database to the user-specific data directory (`%APPDATA%\go-search-engine\links.db`, etc.) unless overridden via `config.json`.
+When run from a bundled executable, the app writes the SQLite database to the user-specific data directory (`%APPDATA%\go-search-engine\links.db`, etc.) unless `GO_DB_PATH` is set before launch.
 
 ## Operational notes
 
