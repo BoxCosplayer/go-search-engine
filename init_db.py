@@ -29,38 +29,50 @@ def _default_db_path() -> str:
     return str(Path.home() / ".local" / "share" / name / "links.db")
 
 
-# Use the same default DB location as the app
-try:
-    from backend.app.db import DB_PATH, ensure_lists_schema, ensure_search_flag_column  # type: ignore
-except Exception:
-    # Fallback to repo-local data folder
-    DB_PATH = os.environ.get("GO_DB_PATH", _default_db_path())
+# Default to repo-local data folder; override if backend.app.db is importable
+DB_PATH = os.environ.get("GO_DB_PATH", _default_db_path())
 
-    def ensure_lists_schema(conn):
-        conn.execute("""
-        CREATE TABLE IF NOT EXISTS lists (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          slug TEXT NOT NULL UNIQUE,
-          name TEXT NOT NULL,
-          description TEXT
-        );
-        """)
-        conn.execute("""
-        CREATE TABLE IF NOT EXISTS link_lists (
-          link_id INTEGER NOT NULL,
-          list_id INTEGER NOT NULL,
-          PRIMARY KEY (link_id, list_id),
-          FOREIGN KEY (link_id) REFERENCES links(id) ON DELETE CASCADE,
-          FOREIGN KEY (list_id) REFERENCES lists(id) ON DELETE CASCADE
-        );
-        """)
+
+def _fallback_ensure_lists_schema(conn):
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS lists (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      slug TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      description TEXT
+    );
+    """)
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS link_lists (
+      link_id INTEGER NOT NULL,
+      list_id INTEGER NOT NULL,
+      PRIMARY KEY (link_id, list_id),
+      FOREIGN KEY (link_id) REFERENCES links(id) ON DELETE CASCADE,
+      FOREIGN KEY (list_id) REFERENCES lists(id) ON DELETE CASCADE
+    );
+    """)
+    conn.commit()
+
+
+def _fallback_ensure_search_flag_column(conn):
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(links)")}
+    if "search_enabled" not in cols:
+        conn.execute("ALTER TABLE links ADD COLUMN search_enabled INTEGER NOT NULL DEFAULT 0")
         conn.commit()
 
-    def ensure_search_flag_column(conn):
-        cols = {row[1] for row in conn.execute("PRAGMA table_info(links)")}
-        if "search_enabled" not in cols:
-            conn.execute("ALTER TABLE links ADD COLUMN search_enabled INTEGER NOT NULL DEFAULT 0")
-            conn.commit()
+
+ensure_lists_schema = _fallback_ensure_lists_schema
+ensure_search_flag_column = _fallback_ensure_search_flag_column
+
+
+try:
+    from backend.app.db import DB_PATH as _DB_PATH, ensure_lists_schema as _ensure_lists_schema, ensure_search_flag_column as _ensure_search_flag_column  # type: ignore
+except Exception:
+    pass
+else:
+    DB_PATH = _DB_PATH
+    ensure_lists_schema = _ensure_lists_schema
+    ensure_search_flag_column = _ensure_search_flag_column
 
 
 def ensure_schema(conn):

@@ -444,3 +444,22 @@ def test_load_config_validation_error(monkeypatch, tmp_path):
     monkeypatch.setattr(utils, "_discover_config_path", lambda: cfg)
     with pytest.raises(ValueError):
         utils.load_config()
+
+
+def test_load_config_wraps_validation_error(monkeypatch, tmp_path):
+    cfg = tmp_path / "config.json"
+    cfg.write_text(json.dumps({"host": "127.0.0.1"}), encoding="utf-8")
+    monkeypatch.setattr(utils, "_discover_config_path", lambda: cfg)
+
+    class DummyValidationError(Exception):
+        pass
+
+    class FailingConfig:
+        def __init__(self, **_):
+            raise DummyValidationError("boom")
+
+    monkeypatch.setattr(utils, "ValidationError", DummyValidationError, raising=False)
+    monkeypatch.setattr(utils, "GoConfig", FailingConfig, raising=False)
+    with pytest.raises(ValueError) as exc:
+        utils.load_config()
+    assert "Invalid configuration" in str(exc.value)

@@ -115,6 +115,29 @@ def test_init_db_import_fallback(monkeypatch, tmp_path):
     importlib.reload(init_db)
 
 
+def test_fallback_helpers_create_schema(tmp_path):
+    conn = sqlite3.connect(tmp_path / "db.sqlite")
+    init_db._fallback_ensure_lists_schema(conn)
+    tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    assert {"lists", "link_lists"}.issubset(tables)
+
+    conn.execute("DROP TABLE IF EXISTS links")
+    conn.execute(
+        """
+        CREATE TABLE links (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          keyword TEXT NOT NULL,
+          url TEXT NOT NULL,
+          title TEXT
+        );
+        """
+    )
+    init_db._fallback_ensure_search_flag_column(conn)
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(links)")}
+    assert "search_enabled" in cols
+    conn.close()
+
+
 def test_init_db_fallback_creates_link_lists(monkeypatch, tmp_path):
     original = builtins.__import__
 
