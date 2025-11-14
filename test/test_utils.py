@@ -30,6 +30,15 @@ def test_default_db_path_windows_fallback(monkeypatch, tmp_path):
     assert utils._default_db_path() == expected
 
 
+def test_user_data_dir_prefers_appdata(monkeypatch, tmp_path):
+    monkeypatch.setattr(utils.sys, "platform", "win32", raising=False)
+    appdata = tmp_path / "AppData"
+    localdata = tmp_path / "LocalAppData"
+    monkeypatch.setenv("APPDATA", str(appdata))
+    monkeypatch.setenv("LOCALAPPDATA", str(localdata))
+    assert utils._user_data_dir() == appdata / "go-search-engine"
+
+
 def test_default_db_path_darwin(monkeypatch, tmp_path):
     monkeypatch.setattr(utils.sys, "platform", "darwin", raising=False)
     monkeypatch.setattr(utils.Path, "home", lambda: tmp_path)

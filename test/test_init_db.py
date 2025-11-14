@@ -18,6 +18,16 @@ def test_init_db_default_path_windows_fallback(monkeypatch, tmp_path):
     assert init_db._default_db_path() == str(expected)
 
 
+def test_init_db_default_path_windows_appdata(monkeypatch, tmp_path):
+    monkeypatch.setattr(init_db.sys, "platform", "win32", raising=False)
+    appdata = tmp_path / "AppData"
+    localdata = tmp_path / "LocalAppData"
+    monkeypatch.setenv("APPDATA", str(appdata))
+    monkeypatch.setenv("LOCALAPPDATA", str(localdata))
+    expected = appdata / "go-search-engine" / "links.db"
+    assert init_db._default_db_path() == str(expected)
+
+
 def test_init_db_default_path_darwin(monkeypatch, tmp_path):
     monkeypatch.setattr(init_db.sys, "platform", "darwin", raising=False)
     monkeypatch.setattr(init_db.Path, "home", lambda: tmp_path)

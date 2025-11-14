@@ -66,7 +66,9 @@ ensure_search_flag_column = _fallback_ensure_search_flag_column
 
 
 try:
-    from backend.app.db import DB_PATH as _DB_PATH, ensure_lists_schema as _ensure_lists_schema, ensure_search_flag_column as _ensure_search_flag_column  # type: ignore
+    from backend.app.db import DB_PATH as _DB_PATH
+    from backend.app.db import ensure_lists_schema as _ensure_lists_schema
+    from backend.app.db import ensure_search_flag_column as _ensure_search_flag_column
 except Exception:
     pass
 else:
