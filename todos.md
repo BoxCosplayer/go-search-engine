@@ -12,13 +12,14 @@
 ~~opensearch integration~~
 ~~Search Flag~~
 ~~export/import shortcuts db~~
-~~add EXEs as releases (cd??)~~
+~~add EXEs as releases~~
 ~~fully rework documentation~~
 
 ## 2.0 features:
 
 ~~Docker support~~
 ~~publish docker image to ghcr / release job~~
+add sast integration
 authentication for adminUI / APIs
 rework adminUI; split off adding links to somewhere w/o authentication
 API ratelimiting
