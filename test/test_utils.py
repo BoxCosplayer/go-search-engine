@@ -352,6 +352,17 @@ def test_load_config_missing_file_creates_default(tmp_path, monkeypatch, fake_db
     assert "db-path" not in data
 
 
+def test_ensure_config_file_handles_invalid_template(tmp_path, monkeypatch):
+    cfg = tmp_path / "config.json"
+    template = cfg.with_name("config-template.txt")
+    template.write_text("[]", encoding="utf-8")
+    monkeypatch.setattr(utils, "_discover_config_path", lambda: cfg)
+    created = utils._ensure_config_file_exists()
+    payload = json.loads(created.read_text(encoding="utf-8"))
+    assert payload["host"] == utils._DEFAULT_CONFIG["host"]
+    assert payload.get("file-allow") == utils._DEFAULT_CONFIG["file-allow"]
+
+
 def test_load_config_ignores_legacy_db_path(monkeypatch, tmp_path, fake_db_default):
     cfg = tmp_path / "config.json"
     cfg.write_text(

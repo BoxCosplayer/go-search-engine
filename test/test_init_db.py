@@ -115,6 +115,24 @@ def test_init_db_import_fallback(monkeypatch, tmp_path):
     importlib.reload(init_db)
 
 
+def test_init_db_fallback_creates_link_lists(monkeypatch, tmp_path):
+    original = builtins.__import__
+
+    def fake_import(name, *args, **kwargs):
+        if name == "backend.app.db":
+            raise ImportError("boom")
+        return original(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+    module = importlib.reload(init_db)
+    conn = sqlite3.connect(tmp_path / "db.sqlite")
+    module.ensure_lists_schema(conn)
+    tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    assert {"lists", "link_lists"}.issubset(tables)
+    conn.close()
+    importlib.reload(init_db)
+
+
 def test_main_missing_csv_exits(monkeypatch, tmp_path):
     db_file = tmp_path / "db.sqlite"
     monkeypatch.setattr(init_db, "DB_PATH", str(db_file), raising=False)
