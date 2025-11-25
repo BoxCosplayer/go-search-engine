@@ -177,11 +177,11 @@ def open_path_with_os(path: str) -> None:
         os.startfile(path)  # type: ignore[attr-defined]  # nosec B606
     elif sys.platform == "darwin":
         opener = shutil.which("open")
-        cmd = opener or "open"
+        cmd = Path(opener).name if opener else "open"
         subprocess.Popen([cmd, path])  # nosec B603
     else:
         opener = shutil.which("xdg-open")
-        cmd = opener or "xdg-open"
+        cmd = Path(opener).name if opener else "xdg-open"
         subprocess.Popen([cmd, path])  # nosec B603
 
 
