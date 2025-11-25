@@ -66,15 +66,13 @@ ensure_search_flag_column = _fallback_ensure_search_flag_column
 
 
 try:
-    from backend.app.db import DB_PATH as _DB_PATH
-    from backend.app.db import ensure_lists_schema as _ensure_lists_schema
-    from backend.app.db import ensure_search_flag_column as _ensure_search_flag_column
-except Exception:
-    pass
+    import backend.app.db as _db
+except ImportError as exc:  # pragma: no cover - optional fallback path
+    print(f"Using fallback DB helpers: {exc}", file=sys.stderr)  # pragma: no cover
 else:
-    DB_PATH = _DB_PATH
-    ensure_lists_schema = _ensure_lists_schema
-    ensure_search_flag_column = _ensure_search_flag_column
+    DB_PATH = _db.DB_PATH
+    ensure_lists_schema = _db.ensure_lists_schema
+    ensure_search_flag_column = _db.ensure_search_flag_column
 
 
 def ensure_schema(conn):

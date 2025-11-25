@@ -1,3 +1,4 @@
+import sqlite3
 from contextlib import suppress
 
 from flask import abort, redirect, request
@@ -24,18 +25,15 @@ def admin_list_add():
     try:
         db.execute("INSERT INTO lists(slug, name, description) VALUES (?, ?, ?)", (slug, name, desc))
         db.commit()
-    except Exception:
+    except sqlite3.IntegrityError:
         abort(400, f"List '{slug}' already exists")
 
     base_url = request.host_url.rstrip("/")
     list_url = f"{base_url}/lists/{slug}"
     title = f"List - {name}"
 
-    try:
-        db.execute("INSERT INTO links(keyword, url, title) VALUES (?, ?, ?)", (slug, list_url, title))
-        db.commit()
-    except Exception:
-        pass
+    db.execute("INSERT OR IGNORE INTO links(keyword, url, title) VALUES (?, ?, ?)", (slug, list_url, title))
+    db.commit()
 
     return redirect("/admin")
 

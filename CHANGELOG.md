@@ -3,6 +3,11 @@
 ## [Major Versions Log](#major-versions-log)
 
 
+## 1.1.7
+
+- Added CI security gates (namely SAST and dependency enforcement)
+- Applied the same gates to docker builds
+
 ## 1.1.6
 
 - Fixed the bundled executable so it now creates all external files (config.json and links.db) in the users appdata folder

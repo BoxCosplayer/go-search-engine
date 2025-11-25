@@ -145,7 +145,7 @@ Available keys:
 
 Override the location of `config.json` by setting the `GO_CONFIG_PATH` environment variable before starting the server. Use `GO_DB_PATH` for the SQLite location. The admin Config page at `/admin/config` edits and saves these values with validation.
 
-## Using go
+## Using the search engine
 
 ### Manage shortcuts
 
@@ -228,6 +228,7 @@ User-specific configuration and SQLite data default to `%APPDATA%\go-search-engi
 - Create pull requests with matching updates to `README.md`, `CHANGELOG.md`, and `todos.md` when behaviour changes.
 - Run `python -m coverage run -m pytest` and `coverage report --fail-under=100` before you push; CI enforces full coverage.
 - Keep lint tidy with `ruff check` and `ruff format`.
+- Security gates run in CI (`codeql`, `bandit`, `pip-audit --strict`); fix any findings before merging.
 - When scripting edits, respect blueprint re-export patterns; see `agents.md` for safe-edit guidelines.
 
 ## Build an executable (PyInstaller)

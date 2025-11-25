@@ -69,7 +69,7 @@ def links():
                 (keyword, url, title, int(search_enabled)),
             )
             db.commit()
-        except Exception:
+        except sqlite3.IntegrityError:
             return {"error": f"keyword '{keyword}' already exists"}, 400
         return {"ok": True}
 
@@ -189,7 +189,7 @@ def lists():
         try:
             db.execute("INSERT INTO lists(slug,name,description) VALUES (?,?,?)", (slug, name, desc))
             db.commit()
-        except Exception:
+        except sqlite3.IntegrityError:
             return {"error": "slug exists"}, 400
 
         # Create a link to the list
@@ -197,11 +197,8 @@ def lists():
         list_url = f"{base_url}/lists/{slug}"
         title = f"List - {name}"
 
-        try:
-            db.execute("INSERT INTO links(keyword, url, title) VALUES (?, ?, ?)", (slug, list_url, title))
-            db.commit()
-        except Exception:
-            pass
+        db.execute("INSERT OR IGNORE INTO links(keyword, url, title) VALUES (?, ?, ?)", (slug, list_url, title))
+        db.commit()
 
         return {"ok": True}
 

@@ -1,7 +1,9 @@
 import json
+import logging
 import os
 import re
-import subprocess
+import shutil
+import subprocess  # nosec B404
 import sys
 from pathlib import Path
 from urllib.parse import urlparse
@@ -28,6 +30,8 @@ try:
     from slugify import slugify  # type: ignore
 except ImportError:  # pragma: no cover
     slugify = None  # type: ignore
+
+logger = logging.getLogger(__name__)
 
 
 def runtime_base_dir() -> Path:
@@ -162,19 +166,23 @@ def is_allowed_path(path: str) -> bool:
             root_abs = os.path.abspath(str(root))
             if os.path.commonpath([path, root_abs]) == root_abs:
                 return True
-    except Exception:
-        pass
+    except OSError as exc:
+        logger.debug("Failed to evaluate allowed path", exc_info=exc)
     return False
 
 
 def open_path_with_os(path: str) -> None:
     """Open a file/folder with the OS default handler (startfile/open/xdg-open)."""
     if sys.platform.startswith("win"):
-        os.startfile(path)  # type: ignore[attr-defined]
+        os.startfile(path)  # type: ignore[attr-defined]  # nosec B606
     elif sys.platform == "darwin":
-        subprocess.Popen(["open", path])
+        opener = shutil.which("open")
+        cmd = opener or "open"
+        subprocess.Popen([cmd, path])  # nosec B603
     else:
-        subprocess.Popen(["xdg-open", path])
+        opener = shutil.which("xdg-open")
+        cmd = opener or "xdg-open"
+        subprocess.Popen([cmd, path])  # nosec B603
 
 
 class GoConfig(BaseModel):

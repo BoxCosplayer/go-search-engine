@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import csv
 import json
+import logging
 import os
 import re
 import sqlite3
 import sys
 import threading
 import webbrowser
-import xml.etree.ElementTree as ET
 from functools import lru_cache
 from html.parser import HTMLParser
 from io import StringIO
@@ -16,6 +16,7 @@ from pathlib import Path
 from urllib.parse import quote_plus, urljoin, urlparse
 
 import httpx
+from defusedxml import ElementTree as ET
 
 try:  # pragma: no cover
     from curl_cffi import requests as curl_requests  # type: ignore
@@ -57,6 +58,8 @@ except Exception:  # pragma: no cover
     Image = None  # type: ignore[assignment]
     ImageDraw = None  # type: ignore[assignment]
     ImageFont = None  # type: ignore[assignment]
+
+logger = logging.getLogger(__name__)
 
 # 64x64 simple dark badge with "go"
 HOST = config.host
@@ -146,7 +149,8 @@ def _http_get(url: str) -> httpx.Response | None:
         candidate = _HTTP_CLIENT.get(url)
         if candidate.status_code < 400:
             return candidate
-    except Exception:  # pragma: no cover - network failure fallback
+    except Exception as exc:  # pragma: no cover - network failure fallback
+        logger.debug("Primary httpx request failed", exc_info=exc)
         candidate = None
     if curl_requests is not None:
         try:
@@ -158,8 +162,8 @@ def _http_get(url: str) -> httpx.Response | None:
             )
             if alt.status_code < 400:
                 return _CurlResponseAdapter(alt)
-        except Exception:  # pragma: no cover - optional dependency failure
-            pass
+        except Exception as exc:  # pragma: no cover - optional dependency failure
+            logger.debug("curl_cffi request failed", exc_info=exc)
     if tls_client is not None:
         try:
             session = tls_client.Session(client_identifier="chrome120")
@@ -171,8 +175,8 @@ def _http_get(url: str) -> httpx.Response | None:
             )
             if alt.status_code < 400:
                 return _TlsClientResponseAdapter(alt)
-        except Exception:  # pragma: no cover - optional dependency failure
-            pass
+        except Exception as exc:  # pragma: no cover - optional dependency failure
+            logger.debug("tls-client request failed", exc_info=exc)
     return resp
 
 
@@ -576,18 +580,12 @@ def _import_shortcuts_from_csv(db, file_storage):
                 )
                 list_id = list_cursor.lastrowid
             list_ids.append(list_id)
-            db.execute(
-                "INSERT OR IGNORE INTO link_lists(link_id, list_id) VALUES (?, ?)",
-                (link_id, list_id),
-            )
 
-        if not list_ids:
-            db.execute("DELETE FROM link_lists WHERE link_id=?", (link_id,))
-        else:
-            placeholders = ",".join("?" for _ in list_ids)
+        db.execute("DELETE FROM link_lists WHERE link_id=?", (link_id,))
+        for list_id in list_ids:
             db.execute(
-                f"DELETE FROM link_lists WHERE link_id=? AND list_id NOT IN ({placeholders})",
-                (link_id, *list_ids),
+                "INSERT INTO link_lists(link_id, list_id) VALUES (?, ?)",
+                (link_id, list_id),
             )
 
     return inserted + updated
