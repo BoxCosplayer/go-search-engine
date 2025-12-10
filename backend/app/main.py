@@ -614,7 +614,7 @@ def index():
     - If `q` is present (e.g., `/?q=gh`), redirect to `/go?q=...`.
     - Otherwise, render the index view listing known links.
     """
-    query = (request.args.get("q") or "").trim() if hasattr(str, "trim") else (request.args.get("q") or "").strip()
+    query = (request.args.get("q") or "").strip()
     if query:
         return redirect(url_for("go", q=query), code=302)
     db = get_db()

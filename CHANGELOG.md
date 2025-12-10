@@ -2,6 +2,10 @@
 
 ## [Major Versions Log](#major-versions-log)
 
+## 1.1.8
+
+- Trimmed down files slightly
+- Added testing to verify versioning
 
 ## 1.1.7
 

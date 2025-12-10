@@ -26,7 +26,6 @@ API ratelimiting
 db security
 speed improvements
 
-
 ## 3.0 features:
 
 rewrite in rust or something

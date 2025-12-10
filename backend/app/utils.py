@@ -150,12 +150,6 @@ def is_allowed_path(path: str) -> bool:
 
     Uses config.file_allow (list of absolute directories). If empty, allow all paths.
     """
-    roots: list[str] = []
-    # try:
-    #     roots = getattr(config, "file_allow", [])  # type: ignore[name-defined]
-    # except Exception:
-    #     pass
-
     roots = getattr(config, "file_allow", [])  # type: ignore[name-defined]
 
     if not roots:
