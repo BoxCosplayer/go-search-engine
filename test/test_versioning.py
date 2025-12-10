@@ -9,4 +9,5 @@ def test_version_matches_latest_changelog_entry():
     version_line = next((line for line in changelog_lines if re.match(r"^##\s+\d+\.\d+\.\d+", line)), None)
     assert version_line, "No version heading found in CHANGELOG.md"
     changelog_version = re.match(r"^##\s+(\d+\.\d+\.\d+)", version_line).group(1)  # type: ignore[union-attr]
-    assert __version__ == changelog_version, f"__version__ {__version__} does not match changelog {changelog_version}"
+    assert __version__ == changelog_version, f"""__version__ {__version__} 
+                                                does not match changelog {changelog_version}"""
