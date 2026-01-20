@@ -28,6 +28,6 @@ speed improvements
 
 ## 3.0 features:
 
-rewrite in rust or something
+rewrite in lower-level language (c/c++/rust etc.)
 official linux / macos support
 official enterprise support
