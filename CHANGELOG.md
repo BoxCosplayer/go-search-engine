@@ -2,6 +2,10 @@
 
 ## [Major Versions Log](#major-versions-log)
 
+## 1.1.9 - 21/01/2026
+
+- Refactored README.md
+
 ## 1.1.8
 
 - Trimmed down files slightly

@@ -1,96 +1,79 @@
 # go -- local shortcuts server
 
-This Flask application lets you register memorable keywords, then jump to the right destination by typing `go <keyword>` (or `go !keyword cats`) in your browser's address bar. It ships with a lightweight admin UI, a JSON API, and optional desktop packaging.
+## Local keyword redirects with a lightweight admin UI and API
 
-## Features
-- Keyword-driven redirects with substring suggestions and an optional fallback search link
-- Browser OpenSearch provider for omnibox integration
-- Optional search bangs: mark a shortcut as searchable and use `go !keyword {terms}` to proxy the target site's query template
-- Optional local file launches guarded by an allow list of directories
-- Browser admin UI for links, lists, and runtime config (no authentication; intended for localhost)
-- JSON API surface for scripting link and list management
-- Optional system tray icon plus a PyInstaller spec for packaging a desktop helper
+Run a local Flask server that lets you type `go <keyword>` (or `go !keyword [search-term]`) in your browser address bar and jump to saved destinations. It ships with a no-auth admin UI, a JSON API, optional search bangs via OpenSearch, and optional file launches guarded by a whitelist. It is currently intended for localhost usage and can run from source, Docker, or a bundled EXE.
 
-## Quick start
+## Demonstration
 
-### Use the latest release (EXE)
+Youtube demonstration currently in the works.
 
-1. Download the most recent EXE asset from the project's Releases page.
-2. Move `go-server.exe` into an empty directory (or extract the release archive there) and double-click it from that folder. The app stores its runtime files under your user profile—`%APPDATA%\go-search-engine` on Windows, `~/Library/Application Support/go-search-engine` on macOS, and `~/.local/share/go-search-engine` on Linux—creating `config.json` and `links.db` there before starting `http://127.0.0.1:5000/`.
-3. Edit the `config.json` file in that profile-specific directory (e.g., `%APPDATA%\go-search-engine\config.json`) to adjust host, port, or other runtime settings, then restart the binary.
-4. Browse to `http://127.0.0.1:5000/admin` to add your first shortcuts or lists.
+## Quick install
 
-By default, the bundled build keeps its SQLite data under the user-specific location above. Set the `GO_DB_PATH` environment variable before launching the app if you need to relocate `links.db`; the admin UI and `config.json` no longer expose a knob for it.
+1. Download the latest `go-server.exe` from the Releases page.
+2. Run it from an empty folder. Runtime files live under `%APPDATA%\go-search-engine` (Windows) or `~/.local/share/go-search-engine` (Linux), and `config.json` plus `links.db` are created on first start.
+3. Edit `config.json` (host, port, debug, allow-files, file-allow, fallback-url) and restart the binary.
+4. Open `http://127.0.0.1:5000/admin` to add shortcuts and lists.
 
-### Run in Docker
+Set `GO_DB_PATH` before launch if you need to relocate `links.db`. 
+Use `GO_CONFIG_PATH` to override the config location.
 
-#### Linux containers (Gunicorn)
+## Advanced install for Docker
 
-1. Pull the published image (`ghcr.io/boxcosplayer/go-server:latest`) or build it locally:
+### Linux containers (Gunicorn)
+
+1. Pull `ghcr.io/boxcosplayer/go-server:latest` or build locally:
    ```bash
    docker build -f docker/Dockerfile.linux -t go-server:linux .
    ```
-2. Run it with a bind mount or named volume for `/data` (config + SQLite live there) and expose the HTTP port:
+2. Run it with a volume mounted at `/data`:
    ```bash
    docker run --rm -p 5000:5000 -v go-data:/data ghcr.io/boxcosplayer/go-server:latest
    ```
-3. The Bash entrypoint copies `config-template.txt` into `/data/config.json` on first start, rewrites `host`/`port` when needed, exports `GO_DB_PATH` (default `/data/links.db`) for the server, and then boots Gunicorn via `backend.wsgi:application`.
+3. The entrypoint copies `config-template.txt` into `/data/config.json` on first start, sets `GO_DB_PATH` (default `/data/links.db`), and boots Gunicorn via `backend.wsgi:application`.
 
-Need a different listener? The container now defaults to `GO_HOST=127.0.0.1` / `GO_PORT=5000`, so `docker run` works without extra flags. Override them by passing matching `-e` switches and publishing the same port, e.g.:
-
-```bash
-docker run --rm \
-  -e GO_PORT=8080 \
-  -p 8080:8080 \
-  -v go-data:/data \
-  ghcr.io/boxcosplayer/go-server:latest
-```
-
-A compose stack is included for repeatable local setups:
+Compose is available for local repeatable setups:
 
 ```bash
 docker compose up --build
 ```
 
-To override settings with Compose, set environment variables before running (e.g. `GO_PORT=8080 docker compose up --build`) or create a `.env` file; `docker-compose.yml` already reads `${GO_HOST}`, `${GO_PORT}`, and `${GO_DB_PATH}` with sensible defaults.
-
-Environment variables accepted by Linux (Gunicorn) containers:
+Common Linux container variables:
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `GO_CONFIG_PATH` | `/data/config.json` (Linux) / `C:\data\config.json` (Windows) | Location of the runtime config file. |
-| `GO_DB_PATH` | `/data/links.db` / `C:\data\links.db` | SQLite destination the server uses; set before start to relocate `links.db`. |
+| `GO_CONFIG_PATH` | `/data/config.json` | Location of the runtime config file. |
+| `GO_DB_PATH` | `/data/links.db` | SQLite destination the server uses. |
 | `GO_HOST` | `127.0.0.1` | Interface the server binds to inside the container. |
 | `GO_PORT` | `5000` | In-container TCP port; match the host mapping when overriding. |
 | `GO_GUNICORN_WORKERS` | `2` | Worker processes for Gunicorn. |
 | `GO_GUNICORN_TIMEOUT` | `60` | Request timeout for Gunicorn, in seconds. |
 | `GO_GUNICORN_EXTRA_ARGS` | *(empty)* | Extra CLI switches appended to the default Gunicorn command. |
 
-Override any of these at `docker run`/compose time to match your environment.
+### Windows containers (EXE)
 
-#### Windows containers (with the bundled EXE)
-
-1. Switch Docker Desktop to **Windows container** mode.
-2. Build the image (multi-stage PyInstaller build):
+1. Switch Docker Desktop to Windows container mode.
+2. Build the image:
    ```powershell
    docker build -t go-server:exe .
    ```
-3. Launch the container and persist data under `C:\data`:
+3. Run it with data stored under `C:\data`:
    ```powershell
    docker run --rm -p 5000:5000 -v go-data:C:\data go-server:exe
    ```
 
-Mount existing config/database files in the same way as before; the PowerShell entrypoint defaults to `GO_HOST=127.0.0.1`, `GO_PORT=5000`, and honors the same overrides as the Linux image (for example `docker run ... -e GO_PORT=8080 -p 8080:8080 ...`).
+Common Windows container variables:
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `GO_CONFIG_PATH` | `C:\data\config.json` | Location of the runtime config file. |
-| `GO_DB_PATH` | `C:\data\links.db` | SQLite destination the server uses; set before start to relocate `links.db`. |
+| `GO_DB_PATH` | `C:\data\links.db` | SQLite destination the server uses. |
 | `GO_HOST` | `127.0.0.1` | Interface the server binds to inside the container. |
 | `GO_PORT` | `5000` | In-container TCP port; match the host mapping when overriding. |
 
+## Run from Source
 
-### Development install
+Python 3.11+ is required (CI runs 3.11; local development uses 3.13).
 
 ```bash
 python -m venv .venv
@@ -106,165 +89,37 @@ cp config-template.txt ~/.local/share/go-search-engine/config.json
 #   New-Item -ItemType Directory -Force -Path "$env:APPDATA\go-search-engine"
 #   Copy-Item config-template.txt "$env:APPDATA\go-search-engine\config.json"
 
-# ensure the SQLite schema exists (optional import step described below)
 python init_db.py
-
-# launch the development server
 python app.py
 ```
 
-The development server binds to the `host` and `port` defined in `config.json` (defaults to `127.0.0.1:5000`) and stores data under the user-specific data directory unless `GO_DB_PATH` is set before launch.
+The dev server uses `config.json` for host and port, and stores data in the user data directory unless `GO_DB_PATH` is set. Use `GO_CONFIG_PATH` to point at a different config file.
 
-Run the tests before shipping changes:
+## How does this work?
+
+- `backend/app/main.py` builds the Flask app, loads config via `backend/app/utils.py`, and wires the `admin`, `api`, and `lists` blueprints.
+- Admin routes live in `backend/app/admin/home.py`, `config_routes.py`, `links.py`, and `lists.py`, and are re-exported from `backend/app/admin/__init__.py`.
+- `backend/app/db.py` owns SQLite connections and schema helpers; `init_db.py` can seed or import CSV data and ensures the lists schema.
+- `backend/wsgi.py` is the production entry point, `app.py` is a compatibility shim, and `go-server.spec` bundles templates for the EXE.
+- Request flow is simple: `/go` looks up the keyword in SQLite and redirects (or uses the fallback URL), while `/admin` and `/api` mutate the same database.
+
+## Want to contribute?
+
+- Read `todos.md`
+- Launch an issue via GitHub GUI
+- Create a branch & file a PR
+- Ensure you run Tests/Linters before you commit
+- Update Changelog and versioning if applicable (CHANGELOG.md, )
+
+Recommended Test / Linting suite
 
 ```bash
-python -m coverage run -m pytest            # Windows: .\.venv\Scripts\python.exe -m coverage run -m pytest
+python -m coverage run -m pytest            # Alternatively: .\.venv\Scripts\python.exe -m coverage run -m pytest
 coverage report --fail-under=100
 ruff check backend
 ruff format backend
 ```
 
-## Browser integration
+Alternatively - shoot me an email at rajveer@sandhuhome.uk
 
-- Configure a custom search engine (Chrome/Edge) or accept the "Add go" prompt (Firefox/compatible Chromium forks) pointing to `http://127.0.0.1:5000/go?q=%s` with keyword `go`.
-- Enable the `search_enabled` flag on a shortcut to run `go !keyword cats`. For sites that block OpenSearch descriptors (e.g., Stack Overflow), set a manual template such as `https://stackoverflow.com/search?q={q}`.
-- Optional endpoints `/opensearch.xml` and `/opensearch/suggest` help browsers discover the provider and surface live suggestions.
-
-## Configuration
-
-Runtime settings live in `config.json` inside the user-specific data directory (`%APPDATA%\go-search-engine` on Windows, `~/Library/Application Support/go-search-engine` on macOS, `~/.local/share/go-search-engine` on Linux). The file is created automatically from `config-template.txt` the first time the app boots, or you can copy the template yourself before running. That same folder also stores the default SQLite database (`links.db`). Set the `GO_DB_PATH` environment variable before launching if you need to keep the database beside the executable or on another volume; the config file no longer exposes this toggle.
-
-Available keys:
-
-- `host` (str, default `127.0.0.1`): network interface for the Flask server.
-- `port` (int, default `5000`): port to bind.
-- `debug` (bool, default `false`): enables Flask debug mode and reloader.
-- `allow-files` (bool): allow launching `file://` shortcuts when the target path is in the allow list.
-- `file-allow` (list of strings): absolute directories that local file links may open. Leave empty to block file opens even if `allow-files` is true.
-- `fallback-url` (str, default empty): template used when no shortcut matches; include `{q}` for the URL encoded query.
-
-Override the location of `config.json` by setting the `GO_CONFIG_PATH` environment variable before starting the server. Use `GO_DB_PATH` for the SQLite location. The admin Config page at `/admin/config` edits and saves these values with validation.
-
-## Using the search engine
-
-### Manage shortcuts
-
-- Visit `http://127.0.0.1:5000/admin` to add, edit, delete, and tag shortcuts. List memberships are created automatically when you assign new slugs.
-- File shortcuts must use `file://` URLs, require `allow-files` set to true, and the target directory must exist in `file-allow`.
-- Keyword matching is case-insensitive; substring suggestions consider keyword, title, and URL fields.
-- `http://127.0.0.1:5000/lists` surfaces lists and their member shortcuts.
-
-Seed shortcuts from the command line with:
-
-```bash
-curl -X POST http://127.0.0.1:5000/api/links \
-  -H "content-type: application/json" \
-  -d '{"keyword":"cal","title":"My Calendar","url":"https://calendar.google.com"}'
-```
-
-### Import and export data
-
-Use `python init_db.py` to ensure the database exists or to import a CSV export:
-
-```bash
-python init_db.py links.csv
-# CSV columns: keyword,title,url
-# extra columns are ignored if present
-```
-
-Each row is matched by keyword—the importer inserts new shortcuts and prints a warning when a keyword already exists (it does not overwrite). Ensure URLs remain unique yourself via the admin UI or API. The script also ensures the lists schema exists so the admin UI works immediately.
-
-Export the current shortcuts at any time:
-
-- Download `http://127.0.0.1:5000/export/shortcuts.csv`, or
-- Click **Export CSV** from the admin UI.
-
-## API endpoints
-
-- `GET /api/links` -- list all links.
-- `POST /api/links` -- add a link (`{"keyword":"gh","url":"https://github.com","title":"GitHub","search_enabled":true}`; the last flag is optional and defaults to `false`).
-- `GET /api/links/<keyword>` -- fetch a single link by keyword (case-insensitive).
-- `PUT /api/links/<keyword>` -- update keyword/title/url for an existing link.
-- `DELETE /api/links/<keyword>` -- remove a link.
-- `GET /api/lists` -- list lists.
-- `POST /api/lists` -- add a list (`{"slug":"work","name":"Work Projects","description":"..."}`).
-- `GET /api/lists/<slug>` -- fetch list metadata with its member links.
-- `PUT /api/lists/<slug>` / `PATCH /api/lists/<slug>` -- update slug/name/description.
-- `DELETE /api/lists/<slug>` -- delete a list (link memberships cascade).
-- `GET /api/lists/<slug>/links` -- list link memberships for a list.
-- `POST /api/lists/<slug>/links` -- add an existing link to a list (`{"keyword":"..."}`).
-- `DELETE /api/lists/<slug>/links/<keyword>` -- remove a link from a list.
-
-All responses are JSON. There is no authentication; run the service on trusted networks only.
-
-## Project layout
-
-```
-backend/
-  app/
-    main.py              # Flask app, routes, tray integration
-    db.py                # Database helpers and schema utilities
-    utils.py             # Config loader, URL helpers, file safety checks
-    api/                 # JSON API blueprint
-    admin/               # Admin UI blueprint (links, lists, config editor)
-    lists/               # List pages blueprint
-    templates/           # Jinja templates for UI pages
-  wsgi.py                # WSGI entry point for production servers
-app.py                   # Compatibility shim that imports backend.app.main
-config-template.txt      # Example config copied into the user data directory when missing
-init_db.py               # CLI helper to initialise/import the database
-requirements.txt         # App dependencies (includes lint/format tooling)
-Dockerfile               # Multi-stage Windows container that runs the PyInstaller exe
-docker/Dockerfile.linux  # Gunicorn-based Linux image that runs the source tree
-docker/entrypoint.sh     # Linux entrypoint that patches config/db paths
-docker/entrypoint.ps1    # Ensures config/db paths exist inside the container
-docker-compose.yml       # Local stack wiring the Linux container + volume
-
-User-specific configuration and SQLite data default to `%APPDATA%\go-search-engine` (Windows), `~/Library/Application Support/go-search-engine` (macOS), or `~/.local/share/go-search-engine` (Linux).
-```
-
-## Development workflow
-
-- Create pull requests with matching updates to `README.md`, `CHANGELOG.md`, and `todos.md` when behaviour changes.
-- Run `python -m coverage run -m pytest` and `coverage report --fail-under=100` before you push; CI enforces full coverage.
-- Keep lint tidy with `ruff check` and `ruff format`.
-- Security gates run in CI (`codeql`, `bandit`, `pip-audit --strict`); fix any findings before merging.
-- When scripting edits, respect blueprint re-export patterns; see `agents.md` for safe-edit guidelines.
-
-## Build an executable (PyInstaller)
-
-Use the provided spec (bundles templates automatically):
-
-```bash
-pip install pyinstaller
-pyinstaller go-server.spec
-# Output ends up in dist/go-server/
-```
-
-Or build quickly without the spec (remember to add templates yourself):
-
-```bash
-pyinstaller -F -n go-server app.py --add-data "backend/app/templates;backend/app/templates"
-```
-
-When run from a bundled executable, the app writes the SQLite database to the user-specific data directory (`%APPDATA%\go-search-engine\links.db`, etc.) unless `GO_DB_PATH` is set before launch.
-
-## Operational notes
-
-- The app assumes localhost usage and exposes no authentication; keep it firewalled.
-- Enabling `allow-files` without scoping `file-allow` may expose sensitive paths; configure both.
-- The tray icon (via `pystray` and `pillow`) offers quick links to Home and Admin when those packages are installed.
-
-## Roadmap
-
-High-level planning lives in `todos.md`. Upcoming milestones focus on 1.0 documentation polish, 2.0 authentication and hardening, and longer-term platform support explorations.
-
-## How to contribute
-
-- Read this README plus `todos.md` to understand current priorities.
-- Prefer focused commits with clear scope and updated docs.
-- Automation or agent workflows should start with `agents.md` and reuse existing helpers when extending blueprints.
-
-## License
-
-MIT. See `LICENSE` for details.
+Thanks!
