@@ -1,5 +1,6 @@
 import csv
 import json
+import logging
 import os
 import sqlite3
 from contextlib import suppress
@@ -7,11 +8,33 @@ from html import escape
 from io import StringIO
 
 from flask import Blueprint, Response, abort, redirect, request, url_for
+from werkzeug.exceptions import BadRequest, HTTPException
 
 from ..db import ensure_lists_schema, get_db, init_db
 from ..utils import sanitize_query, to_slug
 
 api_bp = Blueprint("api", __name__)
+logger = logging.getLogger(__name__)
+
+
+def _get_json_object():
+    if not request.is_json:
+        raise BadRequest("Expected application/json")
+    data = request.get_json(silent=False)
+    if not isinstance(data, dict):
+        raise BadRequest("JSON object required")
+    return data
+
+
+@api_bp.errorhandler(HTTPException)
+def _handle_http_error(err):
+    return {"error": err.description or err.name}, err.code
+
+
+@api_bp.errorhandler(Exception)
+def _handle_unexpected_error(err):
+    logger.exception("API error", exc_info=err)
+    return {"error": "internal server error"}, 500
 
 
 def _coerce_bool(value):
@@ -178,7 +201,7 @@ def links():
     """
     db = get_db()
     if request.method == "POST":
-        data = request.get_json(silent=True) or {}
+        data = _get_json_object()
         keyword = (data.get("keyword") or "").strip()
         url = (data.get("url") or "").strip()
         title = (data.get("title") or "").strip() or None
@@ -188,11 +211,11 @@ def links():
         search_enabled = _coerce_bool(raw_search)
 
         if not keyword or not url:
-            return {"error": "keyword and url are required"}, 400
+            abort(400, "keyword and url are required")
         if any(ch.isspace() for ch in keyword):
-            return {"error": "keyword cannot contain whitespace"}, 400
+            abort(400, "keyword cannot contain whitespace")
         if not (url.startswith("http://") or url.startswith("https://")):
-            return {"error": "url must start with http:// or https://"}, 400
+            abort(400, "url must start with http:// or https://")
         init_db()
         ensure_lists_schema(get_db())
         try:
@@ -220,7 +243,7 @@ def get_link(keyword: str):
         (keyword,),
     ).fetchone()
     if not row:
-        return {"error": "link not found"}, 404
+        abort(404, "link not found")
     return {"link": _serialize_link(row)}
 
 
@@ -233,9 +256,9 @@ def update_link(keyword: str):
         (keyword,),
     ).fetchone()
     if not row:
-        return {"error": "link not found"}, 404
+        abort(404, "link not found")
 
-    data = request.get_json(silent=True) or {}
+    data = _get_json_object()
     new_keyword = (data.get("keyword") or row["keyword"]).strip()
     new_url = (data.get("url") or row["url"]).strip()
     new_title = (data.get("title") or row["title"] or "").strip() or None
@@ -245,11 +268,11 @@ def update_link(keyword: str):
     new_search_enabled = _coerce_bool(raw_search) if raw_search is not None else bool(row["search_enabled"])
 
     if not new_keyword or not new_url:
-        return {"error": "keyword and url are required"}, 400  # pragma: no cover
+        abort(400, "keyword and url are required")  # pragma: no cover
     if any(ch.isspace() for ch in new_keyword):
-        return {"error": "keyword cannot contain whitespace"}, 400
+        abort(400, "keyword cannot contain whitespace")
     if not (new_url.startswith("http://") or new_url.startswith("https://")):
-        return {"error": "url must start with http:// or https://"}, 400
+        abort(400, "url must start with http:// or https://")
 
     try:
         db.execute(
@@ -258,7 +281,7 @@ def update_link(keyword: str):
         )
         db.commit()
     except sqlite3.IntegrityError:
-        return {"error": f"keyword '{new_keyword}' already exists"}, 400
+        abort(400, f"keyword '{new_keyword}' already exists")
 
     return {
         "ok": True,
@@ -280,7 +303,7 @@ def delete_link(keyword: str):
         (keyword,),
     ).fetchone()
     if not row:
-        return {"error": "link not found"}, 404
+        abort(404, "link not found")
     db.execute("DELETE FROM links WHERE id=?", (row["id"],))
     db.commit()
     return {"ok": True}
@@ -308,12 +331,12 @@ def lists():
     db = get_db()
     ensure_lists_schema(db)
     if request.method == "POST":
-        data = request.get_json(force=True)
+        data = _get_json_object()
         slug = (data.get("slug") or "").strip()
         name = (data.get("name") or "").strip()
         desc = (data.get("description") or "").strip() or None
         if not slug and not name:
-            return {"error": "slug or name required"}, 400
+            abort(400, "slug or name required")
         if not slug:
             slug = to_slug(name)
         if not name:
@@ -322,7 +345,7 @@ def lists():
             db.execute("INSERT INTO lists(slug,name,description) VALUES (?,?,?)", (slug, name, desc))
             db.commit()
         except sqlite3.IntegrityError:
-            return {"error": "slug exists"}, 400
+            abort(400, "slug exists")
 
         # Create a link to the list
         base_url = request.host_url.rstrip("/")
@@ -350,7 +373,7 @@ def list_detail(slug: str):
 
     if request.method == "GET":
         if not info:
-            return {"error": "list not found"}, 404
+            abort(404, "list not found")
         rows = db.execute(
             """
             SELECT l.keyword, l.title, l.url
@@ -372,13 +395,13 @@ def list_detail(slug: str):
 
     if request.method in {"PUT", "PATCH"}:
         if not info:
-            return {"error": "list not found"}, 404
-        data = request.get_json(silent=True) or {}
+            abort(404, "list not found")
+        data = _get_json_object()
         new_slug = (data.get("slug") or info["slug"]).strip()
         new_name = (data.get("name") or info["name"]).strip()
         new_desc = (data.get("description") or info["description"] or "").strip() or None
         if not new_slug:
-            return {"error": "slug required"}, 400  # pragma: no cover
+            abort(400, "slug required")  # pragma: no cover
         if not new_name:
             new_name = new_slug.replace("-", " ").title()  # pragma: no cover
         try:
@@ -412,7 +435,7 @@ def list_detail(slug: str):
 
     # DELETE branch
     if not info:
-        return {"error": "list not found"}, 404  # pragma: no cover
+        abort(404, "list not found")  # pragma: no cover
     db.execute("DELETE FROM lists WHERE id=?", (info["id"],))
     with suppress(Exception):
         db.execute("DELETE FROM links WHERE lower(keyword)=lower(?)", (slug,))
@@ -430,7 +453,7 @@ def list_links(slug: str):
         (slug,),
     ).fetchone()
     if not info:
-        return {"error": "list not found"}, 404
+        abort(404, "list not found")
 
     if request.method == "GET":
         rows = db.execute(
@@ -445,16 +468,16 @@ def list_links(slug: str):
         ).fetchall()
         return {"links": [dict(r) for r in rows]}
 
-    data = request.get_json(silent=True) or {}
+    data = _get_json_object()
     keyword = (data.get("keyword") or "").strip()
     if not keyword:
-        return {"error": "keyword required"}, 400
+        abort(400, "keyword required")
     link = db.execute(
         "SELECT id FROM links WHERE lower(keyword)=lower(?)",
         (keyword,),
     ).fetchone()
     if not link:
-        return {"error": "link not found"}, 404
+        abort(404, "link not found")
     db.execute(
         "INSERT OR IGNORE INTO link_lists(link_id, list_id) VALUES (?, ?)",
         (link["id"], info["id"]),
@@ -473,13 +496,13 @@ def remove_list_link(slug: str, keyword: str):
         (slug,),
     ).fetchone()
     if not info:
-        return {"error": "list not found"}, 404
+        abort(404, "list not found")
     link = db.execute(
         "SELECT id FROM links WHERE lower(keyword)=lower(?)",
         (keyword,),
     ).fetchone()
     if not link:
-        return {"error": "link not found"}, 404
+        abort(404, "link not found")
     db.execute(
         "DELETE FROM link_lists WHERE link_id=? AND list_id=?",
         (link["id"], info["id"]),

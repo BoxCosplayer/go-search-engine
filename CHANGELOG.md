@@ -2,6 +2,15 @@
 
 ## [Major Versions Log](#major-versions-log)
 
+## 1.1.12 - 26/01/2026
+
+- Render admin form errors inline instead of a generic error page
+- Routed admin validation errors through the shared admin error renderer
+
+## 1.1.11 - 26/01/2026
+
+- Standardized API JSON error handling for bad requests
+
 ## 1.1.10 - 26/01/2026
 
 - Moved some functions from main.py to the api folder (/api/__init.py__)

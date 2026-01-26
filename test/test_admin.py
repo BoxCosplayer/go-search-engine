@@ -1,6 +1,8 @@
 import json
 
 from backend.app.admin import config_routes
+from backend.app.admin import home as admin_home
+from werkzeug.exceptions import BadRequest
 
 
 def test_admin_home_lists_links(client, db_conn):
@@ -20,6 +22,13 @@ def test_admin_home_edit_mode(client, db_conn):
     rv = client.get("/admin/", query_string={"edit": "gh"})
     assert rv.status_code == 200
     assert b'value="https://github.com"' in rv.data
+
+
+def test_admin_error_handler_renders_message(app_ctx):
+    with app_ctx.test_request_context("/admin/"):
+        body, status = admin_home._handle_admin_http_error(BadRequest("boom"))
+    assert status == 400
+    assert "boom" in body
 
 
 def test_admin_config_get_and_post(client):
@@ -114,6 +123,7 @@ def test_admin_add_validation_and_duplicate(client, db_conn):
     client.post("/admin/add", data={"keyword": "gh", "url": "https://github.com"})
     rv = client.post("/admin/add", data={"keyword": "gh", "url": "https://github.com"})
     assert rv.status_code == 400
+    assert b"already exists" in rv.data
 
 
 def test_admin_delete_requires_keyword(client):
