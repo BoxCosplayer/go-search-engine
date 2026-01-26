@@ -2,6 +2,10 @@
 
 ## [Major Versions Log](#major-versions-log)
 
+## 1.1.10 - 26/01/2026
+
+- Moved some functions from main.py to the api folder (/api/__init.py__)
+
 ## 1.1.9 - 21/01/2026
 
 - Refactored README.md

@@ -1,10 +1,15 @@
+import csv
+import json
+import os
 import sqlite3
 from contextlib import suppress
+from html import escape
+from io import StringIO
 
-from flask import Blueprint, request
+from flask import Blueprint, Response, abort, redirect, request, url_for
 
 from ..db import ensure_lists_schema, get_db, init_db
-from ..utils import to_slug
+from ..utils import sanitize_query, to_slug
 
 api_bp = Blueprint("api", __name__)
 
@@ -26,6 +31,133 @@ def _serialize_link(row):
         "url": row["url"],
         "search_enabled": bool(row["search_enabled"]),
     }
+
+
+def _search_suggestions(db, term: str):
+    """Return best-effort search suggestions for a query term."""
+    term = (term or "").strip()
+    if not term:
+        return []
+    like = f"%{term}%"
+    rows = db.execute(
+        """
+        SELECT keyword, title, url
+        FROM links
+        WHERE keyword LIKE ? OR (title IS NOT NULL AND title LIKE ?) OR url LIKE ?
+        ORDER BY keyword COLLATE NOCASE LIMIT 10
+        """,
+        (like, like, like),
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def _select_links_with_lists(db):
+    """Return rows of shortcuts with joined list slugs."""
+    return db.execute(
+        """
+        SELECT l.keyword, l.title, l.url, l.search_enabled,
+               IFNULL(GROUP_CONCAT(li.slug, ', '), '') AS lists_csv
+        FROM links l
+        LEFT JOIN link_lists ll ON ll.link_id = l.id
+        LEFT JOIN lists li ON li.id = ll.list_id
+        GROUP BY l.id
+        ORDER BY l.keyword COLLATE NOCASE
+        """
+    ).fetchall()
+
+
+def _delete_link(db, link_id):
+    """Remove a link and its list relationships."""
+    db.execute("DELETE FROM link_lists WHERE link_id=?", (link_id,))
+    db.execute("DELETE FROM links WHERE id=?", (link_id,))
+
+
+def _import_shortcuts_from_csv(db, file_storage):
+    """Parse the provided CSV upload and merge shortcuts into the database."""
+    payload = file_storage.read()
+    if not payload:
+        return 0
+    text = payload.decode("utf-8-sig") if isinstance(payload, bytes) else str(payload)
+    if not text.strip():
+        return 0
+    buffer = StringIO(text)
+    reader = csv.DictReader(buffer)
+
+    inserted = 0
+    updated = 0
+    for row in reader:
+        keyword = (row.get("keyword") or "").strip()
+        url = (row.get("url") or "").strip()
+        if not keyword or not url:
+            continue
+        title = (row.get("title") or "").strip()
+        raw_flag = (row.get("search_enabled") or "").strip().lower()
+        search_enabled = 1 if raw_flag in {"1", "true", "yes", "y", "on"} else 0
+
+        existing_keyword = db.execute(
+            "SELECT id FROM links WHERE lower(keyword)=lower(?)",
+            (keyword,),
+        ).fetchone()
+        existing_url = db.execute(
+            "SELECT id FROM links WHERE lower(url)=lower(?)",
+            (url,),
+        ).fetchone()
+
+        if existing_keyword:
+            link_id = existing_keyword["id"]
+            db.execute(
+                "UPDATE links SET keyword=?, url=?, title=?, search_enabled=? WHERE id=?",
+                (keyword, url, title or None, search_enabled, link_id),
+            )
+            updated += 1
+        elif existing_url:
+            link_id = existing_url["id"]
+            db.execute(
+                "UPDATE links SET keyword=?, url=?, title=?, search_enabled=? WHERE id=?",
+                (keyword, url, title or None, search_enabled, link_id),
+            )
+            updated += 1
+        else:
+            cur = db.execute(
+                "INSERT INTO links(keyword, url, title, search_enabled) VALUES (?, ?, ?, ?)",
+                (keyword, url, title or None, search_enabled),
+            )
+            link_id = cur.lastrowid
+            inserted += 1
+
+        duplicates = db.execute(
+            "SELECT id FROM links WHERE lower(url)=lower(?) AND id <> ?",
+            (url, link_id),
+        ).fetchall()
+        for duplicate in duplicates:
+            _delete_link(db, duplicate["id"])
+
+        lists_field = row.get("lists") or ""
+        slugs = [slug.strip() for slug in lists_field.split(",") if slug.strip()]
+        list_ids: list[int] = []
+        for slug in slugs:
+            list_row = db.execute(
+                "SELECT id FROM lists WHERE lower(slug)=lower(?)",
+                (slug,),
+            ).fetchone()
+            if list_row:
+                list_id = list_row["id"]
+            else:
+                list_cursor = db.execute(
+                    "INSERT INTO lists(slug, name) VALUES (?, ?)",
+                    (slug, slug),
+                )
+                list_id = list_cursor.lastrowid
+            list_ids.append(list_id)
+
+        db.execute("DELETE FROM link_lists WHERE link_id=?", (link_id,))
+        for list_id in list_ids:
+            db.execute(
+                "INSERT INTO link_lists(link_id, list_id) VALUES (?, ?)",
+                (link_id, list_id),
+            )
+
+    return inserted + updated
 
 
 @api_bp.route("/links", methods=["GET", "POST"])
@@ -70,7 +202,7 @@ def links():
             )
             db.commit()
         except sqlite3.IntegrityError:
-            return {"error": f"keyword '{keyword}' already exists"}, 400
+            return {"error": f"keyword '{escape(keyword)}' already exists"}, 400
         return {"ok": True}
 
     rows = db.execute(
@@ -131,9 +263,9 @@ def update_link(keyword: str):
     return {
         "ok": True,
         "link": {
-            "keyword": new_keyword,
-            "title": new_title,
-            "url": new_url,
+            "keyword": escape(new_keyword),
+            "title": escape(new_title) if new_title is not None else None,
+            "url": escape(new_url),
             "search_enabled": new_search_enabled,
         },
     }
@@ -256,7 +388,7 @@ def list_detail(slug: str):
             )
             db.commit()
         except sqlite3.IntegrityError:
-            return {"error": f"slug '{new_slug}' already exists"}, 400
+            return {"error": f"slug '{escape(new_slug)}' already exists"}, 400
 
         # Update the auto-created shortcut link if it exists (best effort).
         with suppress(Exception):
@@ -269,7 +401,14 @@ def list_detail(slug: str):
             )
             db.commit()
 
-        return {"ok": True, "list": {"slug": new_slug, "name": new_name, "description": new_desc}}
+        return {
+            "ok": True,
+            "list": {
+                "slug": escape(new_slug),
+                "name": escape(new_name),
+                "description": escape(new_desc) if new_desc is not None else None,
+            },
+        }
 
     # DELETE branch
     if not info:
@@ -347,3 +486,93 @@ def remove_list_link(slug: str, keyword: str):
     )
     db.commit()
     return {"ok": True}
+
+
+# Root-level endpoints registered in main.py.
+
+
+def healthz():
+    """Lightweight health check endpoint.
+
+    Returns JSON {"status": "ok"} when a simple `SELECT 1` succeeds, or
+    an error payload with HTTP 500 when it fails.
+    """
+    try:
+        db = get_db()
+        db.execute("SELECT 1")
+        return {"status": "ok"}
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}, 500
+
+
+def export_shortcuts_csv():
+    """Download all shortcuts as a CSV attachment."""
+    db = get_db()
+    ensure_lists_schema(db)
+    rows = _select_links_with_lists(db)
+
+    buffer = StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(["keyword", "title", "url", "search_enabled", "lists"])
+    for row in rows:
+        writer.writerow(
+            [
+                row["keyword"],
+                row["title"] or "",
+                row["url"],
+                "1" if row["search_enabled"] else "0",
+                row["lists_csv"] or "",
+            ]
+        )
+
+    csv_data = buffer.getvalue()
+    response = Response(csv_data, content_type="text/csv; charset=utf-8")
+    response.headers["Content-Disposition"] = 'attachment; filename="shortcuts.csv"'
+    return response
+
+
+def import_shortcuts_csv():
+    """Handle CSV uploads and merge shortcuts into the database."""
+    uploaded = request.files.get("file")
+    if uploaded is None or not uploaded.filename:
+        abort(400, "Missing CSV upload")
+    uploaded.stream.seek(0, os.SEEK_SET)
+
+    db = get_db()
+    ensure_lists_schema(db)
+    _import_shortcuts_from_csv(db, uploaded)
+    db.commit()
+    return redirect(url_for("index"))
+
+
+def opensearch_description():
+    """Serve the OpenSearch description document for auto-discovery."""
+    base_url = request.host_url.rstrip("/")
+    search_url = f"{base_url}/go?q={{searchTerms}}"
+    suggest_url = f"{base_url}/opensearch/suggest?q={{searchTerms}}"
+    safe_search_url = escape(search_url, quote=True)
+    safe_suggest_url = escape(suggest_url, quote=True)
+    xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">
+  <ShortName>go</ShortName>
+  <Description>Local shortcuts search</Description>
+  <Url type="text/html" method="get" template="{safe_search_url}"/>
+  <Url type="application/x-suggestions+json" template="{safe_suggest_url}"/>
+  <InputEncoding>UTF-8</InputEncoding>
+  <OutputEncoding>UTF-8</OutputEncoding>
+</OpenSearchDescription>
+"""
+    return Response(xml, mimetype="application/opensearchdescription+xml")
+
+
+def opensearch_suggest():
+    """Return OpenSearch-style JSON suggestions for browsers supporting it."""
+    raw_q = request.args.get("q") or ""
+    q = sanitize_query(raw_q)
+    db = get_db()
+    matches = _search_suggestions(db, q)
+    keywords = [item["keyword"] for item in matches]
+    titles = [(item.get("title") or item["keyword"]) for item in matches]
+    urls = [item["url"] for item in matches]
+    payload = json.dumps([q, keywords, titles, urls])
+    return Response(payload, mimetype="application/x-suggestions+json")
