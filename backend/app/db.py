@@ -5,7 +5,7 @@ from pathlib import Path
 
 from flask import g
 
-from .utils import get_db_path
+from .utils import config, get_db_path
 
 
 def _base_dir() -> str:
@@ -23,6 +23,63 @@ def _base_dir() -> str:
 BASE_DIR = _base_dir()
 
 DB_PATH = str(get_db_path())
+
+
+def _build_seed_base_url(host: str, port: int) -> str:
+    host = (host or "127.0.0.1").strip()
+    base = host.rstrip("/") if host.startswith(("http://", "https://")) else f"http://{host}"
+    host_part = base.split("://", 1)[-1]
+    if ":" not in host_part:
+        base = f"{base}:{port}"
+    return base
+
+
+def _seed_links_payload(base_url: str) -> list[tuple[str, str, str]]:
+    base = base_url.rstrip("/")
+    return [
+        ("home", base, "Home"),
+        ("lists", f"{base}/lists", "Lists"),
+        ("admin", f"{base}/admin", "Admin"),
+    ]
+
+
+def ensure_links_schema(db):
+    """Ensure the core `links` table exists and search flag column is present."""
+    db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS links (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          keyword TEXT NOT NULL UNIQUE,
+          url TEXT NOT NULL,
+          title TEXT,
+          search_enabled INTEGER NOT NULL DEFAULT 0
+        );
+        """
+    )
+    db.commit()
+    ensure_search_flag_column(db)
+
+
+def ensure_seed_links(db, base_url: str | None = None) -> bool:
+    """Seed default shortcuts when no links exist.
+
+    Returns True when seeds are inserted; False when the table already had data.
+    """
+    existing = db.execute("SELECT 1 FROM links LIMIT 1").fetchone()
+    if existing:
+        return False
+    if base_url is None:
+        base_url = _build_seed_base_url(
+            getattr(config, "host", "127.0.0.1"),
+            int(getattr(config, "port", 5000)),
+        )
+    payload = _seed_links_payload(base_url)
+    db.executemany(
+        "INSERT OR IGNORE INTO links(keyword, url, title) VALUES (?, ?, ?)",
+        payload,
+    )
+    db.commit()
+    return True
 
 
 def get_db():
@@ -43,6 +100,8 @@ def get_db():
         g.db = sqlite3.connect(str(db_file))
         g.db.row_factory = sqlite3.Row
         g.db.execute("PRAGMA foreign_keys = ON")
+        ensure_links_schema(g.db)
+        ensure_seed_links(g.db)
     return g.db
 
 
@@ -54,24 +113,10 @@ def close_db(exc):
 
 
 def init_db():
-    """Ensure the core `links` table exists.
-
-    Creates the `links` table if missing and commits the change.
-    """
+    """Ensure the core `links` table exists and seed defaults."""
     db = get_db()
-    db.execute(
-        """
-        CREATE TABLE IF NOT EXISTS links (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          keyword TEXT NOT NULL UNIQUE,
-          url TEXT NOT NULL,
-          title TEXT,
-          search_enabled INTEGER NOT NULL DEFAULT 0
-        );
-        """
-    )
-    db.commit()
-    ensure_search_flag_column(db)
+    ensure_links_schema(db)
+    ensure_seed_links(db)
 
 
 def ensure_search_flag_column(db):
@@ -111,6 +156,22 @@ def ensure_lists_schema(db):
           PRIMARY KEY (link_id, list_id),
           FOREIGN KEY (link_id) REFERENCES links(id) ON DELETE CASCADE,
           FOREIGN KEY (list_id) REFERENCES lists(id) ON DELETE CASCADE
+        );
+        """
+    )
+    db.commit()
+
+
+def ensure_admin_users_schema(db):
+    """Ensure admin user tables exist (`admin_users`)."""
+    db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS admin_users (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          username TEXT NOT NULL UNIQUE,
+          password_hash TEXT NOT NULL,
+          is_active INTEGER NOT NULL DEFAULT 1,
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
         """
     )

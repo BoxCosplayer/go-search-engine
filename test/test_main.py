@@ -1,3 +1,4 @@
+import base64
 import json
 import os
 from io import BytesIO
@@ -15,6 +16,11 @@ def add_link(conn, keyword, url, title=None, search_enabled=False):
         (keyword, url, title, int(search_enabled)),
     )
     conn.commit()
+
+
+def _basic_auth(username: str, password: str) -> dict[str, str]:
+    token = base64.b64encode(f"{username}:{password}".encode()).decode("utf-8")
+    return {"Authorization": f"Basic {token}"}
 
 
 def add_list(conn, slug, name, description=""):
@@ -76,6 +82,18 @@ def test_export_shortcuts_csv(client, db_conn):
     body = rv.data.decode("utf-8").splitlines()
     assert body[0] == "keyword,title,url,search_enabled,lists"
     assert any(line.startswith("gh,GitHub,https://github.com,1,dev") for line in body[1:])
+
+
+def test_export_shortcuts_requires_admin_auth(client, db_conn, test_config):
+    test_config.admin_auth_enabled = True
+    add_link(db_conn, "gh", "https://github.com", "GitHub", search_enabled=True)
+
+    rv = client.get("/export/shortcuts.csv")
+    assert rv.status_code == 401
+
+    headers = _basic_auth("admin", "secret")
+    rv = client.get("/export/shortcuts.csv", headers=headers)
+    assert rv.status_code == 200
 
 
 def test_import_shortcuts_csv(client, db_conn):
@@ -151,14 +169,14 @@ def test_import_shortcuts_with_empty_file(client, db_conn):
     rv = client.post("/import/shortcuts", data={"file": (BytesIO(b""), "empty.csv")})
     assert rv.status_code == 302
     count = db_conn.execute("SELECT COUNT(*) FROM links").fetchone()[0]
-    assert count == 0
+    assert count == 3
 
 
 def test_import_shortcuts_with_blank_content(client, db_conn):
     rv = client.post("/import/shortcuts", data={"file": (BytesIO(b"   \n "), "blank.csv")})
     assert rv.status_code == 302
     count = db_conn.execute("SELECT COUNT(*) FROM links").fetchone()[0]
-    assert count == 0
+    assert count == 3
 
 
 def test_import_shortcuts_prioritises_new_keyword_on_url_conflict(client, db_conn):
@@ -173,7 +191,7 @@ def test_import_shortcuts_prioritises_new_keyword_on_url_conflict(client, db_con
     rv = client.post("/import/shortcuts", data={"file": (BytesIO(csv_payload), "shortcuts.csv")})
     assert rv.status_code == 302
     keywords = {row["keyword"] for row in db_conn.execute("SELECT keyword FROM links").fetchall()}
-    assert keywords == {"github"}
+    assert keywords == {"admin", "home", "lists", "github"}
     row = db_conn.execute(
         "SELECT keyword, search_enabled FROM links WHERE lower(url)=lower(?)",
         ("https://github.com",),

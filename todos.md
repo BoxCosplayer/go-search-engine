@@ -20,7 +20,7 @@
 ~~Docker support~~
 ~~publish docker image to ghcr / release job~~
 ~~add sast integration~~
-authentication for adminUI / APIs
+~~authentication for adminUI / APIs~~
 rework adminUI; split off adding links to somewhere w/o authentication
 API ratelimiting
 db security

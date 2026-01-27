@@ -1,7 +1,16 @@
 import sqlite3
 from pathlib import Path
 
-from backend.app.db import close_db, ensure_lists_schema, ensure_search_flag_column, get_db, init_db
+from backend.app.db import (
+    close_db,
+    ensure_admin_users_schema,
+    ensure_links_schema,
+    ensure_lists_schema,
+    ensure_search_flag_column,
+    ensure_seed_links,
+    get_db,
+    init_db,
+)
 
 
 def test_get_db_reuses_connection(app_ctx):
@@ -34,6 +43,44 @@ def test_init_db_creates_links_table(app_ctx):
     close_db(None)
 
 
+def test_seed_links_inserted_when_empty(app_ctx, test_config):
+    conn = get_db()
+    rows = conn.execute("SELECT keyword, url, title FROM links ORDER BY keyword").fetchall()
+    assert [row["keyword"] for row in rows] == ["admin", "home", "lists"]
+    base_url = f"http://{test_config.host}:{test_config.port}"
+    expected = {
+        "home": base_url,
+        "lists": f"{base_url}/lists",
+        "admin": f"{base_url}/admin",
+    }
+    assert {row["keyword"]: row["url"] for row in rows} == expected
+    assert {row["keyword"]: row["title"] for row in rows} == {
+        "home": "Home",
+        "lists": "Lists",
+        "admin": "Admin",
+    }
+
+
+def test_ensure_seed_links_skips_when_existing(tmp_path):
+    conn = sqlite3.connect(tmp_path / "links.sqlite")
+    conn.row_factory = sqlite3.Row
+    ensure_links_schema(conn)
+    conn.execute("INSERT INTO links(keyword, url) VALUES ('gh', 'https://github.com')")
+    conn.commit()
+    inserted = ensure_seed_links(conn, base_url="http://localhost:5000")
+    assert inserted is False
+    count = conn.execute("SELECT COUNT(*) FROM links").fetchone()[0]
+    assert count == 1
+    conn.close()
+
+
+def test_build_seed_base_url_handles_scheme():
+    from backend.app import db as db_mod
+
+    assert db_mod._build_seed_base_url("http://localhost", 5000) == "http://localhost:5000"
+    assert db_mod._build_seed_base_url("https://example.com:9000", 5000) == "https://example.com:9000"
+
+
 def test_ensure_search_flag_column_adds_missing_column(tmp_path):
     db_file = tmp_path / "legacy.sqlite"
     conn = sqlite3.connect(db_file)
@@ -64,6 +111,14 @@ def test_ensure_lists_schema_creates_tables(app_ctx):
         ).fetchall()
     }
     assert names == {"lists", "link_lists"}
+    close_db(None)
+
+
+def test_ensure_admin_users_schema_creates_table(app_ctx):
+    conn = get_db()
+    ensure_admin_users_schema(conn)
+    row = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='admin_users'").fetchone()
+    assert row["name"] == "admin_users"
     close_db(None)
 
 

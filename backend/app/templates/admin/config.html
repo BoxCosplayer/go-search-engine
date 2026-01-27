@@ -247,6 +247,11 @@
           <label for="allow_files">Allow opening local file paths</label>
         </div>
 
+        <div class="checkbox-row">
+          <input id="admin_auth_enabled" name="admin_auth_enabled" type="checkbox" {% if form.admin_auth_enabled %}checked{% endif %}>
+          <label for="admin_auth_enabled">Require authentication for admin pages</label>
+        </div>
+
         <div class="flash notice">
           <strong>Database location</strong><br>
           Stored at <code>{{ db_path }}</code>. Set the <code>GO_DB_PATH</code> environment variable before starting the server if you need to move it.

@@ -1,14 +1,4 @@
-########################################
-# Python
-########################################
 __pycache__/
-*.py[cod]
-*$py.class
-*.pyd
-
-########################################
-# Packaging / build artifacts
-########################################
 .Python
 build/
 dist/
@@ -16,77 +6,20 @@ dist/
 *.egg-info/
 *.egg
 wheels/
-pip-log.txt
-pip-delete-this-directory.txt
-
-########################################
-# Test / coverage caches
-########################################
-htmlcov/
-.tox/
-.nox/
 .coverage
 .coverage.*
 .cache/
 .pytest_cache/
-nosetests.xml
+.ruff_cache/
 coverage.xml
 *.cover
-*.py,cover
-.hypothesis/
-
-########################################
-# Virtual environments
-########################################
 .venv/
-venv/
-env/
-ENV/
-env.bak/
-venv.bak/
-.env
-.env.*
-!.env.example
-
-########################################
-# IDE / Editor
-########################################
 .vscode/
-.idea/
-*.code-workspace
-.ropeproject/
+config.json
 
-########################################
-# OS junk
-########################################
-.DS_Store
-Thumbs.db
-desktop.ini
-
-########################################
-# Logs
-########################################
-*.log
-
-########################################
-# App data (SQLite, generated)
-########################################
 **/data/
 *.db
 *.sqlite
 
-########################################
-# PyInstaller output (keep .spec tracked)
-########################################
-build/
-dist/
 
-########################################
-# Env Storage / Config Files
-########################################
-/config.json
-
-########################################
-# self-notes
-########################################
 /personal-todos.md

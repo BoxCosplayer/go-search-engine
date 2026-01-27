@@ -12,8 +12,17 @@ Youtube demonstration currently in the works.
 
 1. Download the latest `go-server.exe` from the Releases page.
 2. Run it from an empty folder. Runtime files live under `%APPDATA%\go-search-engine` (Windows) or `~/.local/share/go-search-engine` (Linux), and `config.json` plus `links.db` are created on first start.
-3. Edit `config.json` (host, port, debug, allow-files, file-allow, fallback-url) and restart the binary.
+3. Edit `config.json` (host, port, debug, allow-files, file-allow, fallback-url, admin-auth-enabled) and restart the binary.
 4. Open `http://127.0.0.1:5000/admin` to add shortcuts and lists.
+   - When the database starts empty, the app seeds `home`, `lists`, and `admin` shortcuts pointing at the configured host/port.
+
+Finally, add it to your search engine list with the keyword `go`, and go!
+
+```
+name: go
+url: http://[ip]:[port]/go?q=%s
+keyword: go
+```
 
 Set `GO_DB_PATH` before launch if you need to relocate `links.db`. 
 Use `GO_CONFIG_PATH` to override the config location.
@@ -94,6 +103,8 @@ python app.py
 ```
 
 The dev server uses `config.json` for host and port, and stores data in the user data directory unless `GO_DB_PATH` is set. Use `GO_CONFIG_PATH` to point at a different config file.
+
+When `admin-auth-enabled` is true, `/admin` requires HTTP Basic Auth. If no admin users exist yet, the first successful Basic Auth attempt will create the initial user. Manage additional users at `http://127.0.0.1:5000/admin/users`.
 
 ## How does this work?
 

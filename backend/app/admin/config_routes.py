@@ -3,6 +3,7 @@ import json
 from flask import render_template, request
 
 from .. import utils
+from ..db import ensure_admin_users_schema, get_db
 from ..utils import GoConfig, _discover_config_path, load_config
 from . import admin_bp
 
@@ -16,6 +17,7 @@ def _config_to_form_data(cfg: GoConfig) -> dict[str, object]:
         "allow_files": cfg.allow_files,
         "fallback_url": cfg.fallback_url,
         "file_allow": "\n".join(cfg.file_allow),
+        "admin_auth_enabled": cfg.admin_auth_enabled,
     }
 
 
@@ -48,7 +50,18 @@ def admin_config():
             "allow_files": "allow_files" in request.form,
             "fallback_url": fallback_url,
             "file_allow": file_allow_raw,
+            "admin_auth_enabled": "admin_auth_enabled" in request.form,
         }
+
+        if form_values["admin_auth_enabled"]:
+            db = get_db()
+            ensure_admin_users_schema(db)
+            row = db.execute("SELECT COUNT(*) AS c FROM admin_users").fetchone()
+            if not row or row["c"] == 0:
+                save_error = (
+                    "Create at least one admin user before enabling authentication. "
+                    "Visit /admin/users to add a user."
+                )
 
         payload = {
             "host": form_values["host"],
@@ -57,24 +70,26 @@ def admin_config():
             "allow_files": form_values["allow_files"],
             "fallback_url": form_values["fallback_url"],
             "file_allow": file_allow_list,
+            "admin_auth_enabled": form_values["admin_auth_enabled"],
         }
 
-        try:
-            new_cfg = GoConfig(**payload)
-        except Exception as exc:  # pragma: no cover - surfaced to UI
-            save_error = f"Unable to save configuration: {exc}"
-        else:
-            cfg_path = _discover_config_path()
-            cfg_path.write_text(
-                json.dumps(new_cfg.model_dump(by_alias=True), indent=4) + "\n",
-                encoding="utf-8",
-            )
-            utils.config = new_cfg
-            current_cfg = new_cfg
-            form_values = _config_to_form_data(new_cfg)
-            load_error = ""
-            message = "Configuration saved."
-            current_db_path = str(utils.get_db_path())
+        if not save_error:
+            try:
+                new_cfg = GoConfig(**payload)
+            except Exception as exc:  # pragma: no cover - surfaced to UI
+                save_error = f"Unable to save configuration: {exc}"
+            else:
+                cfg_path = _discover_config_path()
+                cfg_path.write_text(
+                    json.dumps(new_cfg.model_dump(by_alias=True), indent=4) + "\n",
+                    encoding="utf-8",
+                )
+                utils.config = new_cfg
+                current_cfg = new_cfg
+                form_values = _config_to_form_data(new_cfg)
+                load_error = ""
+                message = "Configuration saved."
+                current_db_path = str(utils.get_db_path())
 
     return render_template(
         "admin/config.html",
