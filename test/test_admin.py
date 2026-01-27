@@ -439,3 +439,17 @@ def test_admin_users_management_routes(client, db_conn, test_config):
         headers=headers,
     )
     assert rv.status_code == 302
+
+
+def test_admin_post_redirects_without_auth(client, db_conn, test_config):
+    test_config.admin_auth_enabled = True
+    ensure_admin_users_schema(db_conn)
+    db_conn.execute(
+        "INSERT INTO admin_users(username, password_hash, is_active) VALUES (?, ?, ?)",
+        ("admin", generate_password_hash("secret"), 1),
+    )
+    db_conn.commit()
+
+    rv = client.post("/admin/add", data={"keyword": "gh", "url": "https://github.com"})
+    assert rv.status_code == 302
+    assert rv.headers["Location"].endswith("/")

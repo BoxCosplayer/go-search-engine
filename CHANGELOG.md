@@ -2,6 +2,10 @@
 
 ## [Major Versions Log](#major-versions-log)
 
+## 1.2.1 - 28/01/2026
+
+- Redirect unauthenticated API access to the home page (except bootstrap)
+
 ## 1.2.0 - 27/01/2026
 
 - Added optional admin-only authentication with bootstrap user creation

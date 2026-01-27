@@ -8,6 +8,8 @@ from urllib.parse import quote_plus
 
 import pytest
 from backend.app import main
+from backend.app.db import ensure_admin_users_schema
+from werkzeug.security import generate_password_hash
 
 
 def add_link(conn, keyword, url, title=None, search_enabled=False):
@@ -89,11 +91,44 @@ def test_export_shortcuts_requires_admin_auth(client, db_conn, test_config):
     add_link(db_conn, "gh", "https://github.com", "GitHub", search_enabled=True)
 
     rv = client.get("/export/shortcuts.csv")
-    assert rv.status_code == 401
+    assert rv.status_code == 302
+    assert rv.headers["Location"].endswith("/")
 
     headers = _basic_auth("admin", "secret")
     rv = client.get("/export/shortcuts.csv", headers=headers)
     assert rv.status_code == 200
+
+
+def test_export_shortcuts_redirects_when_user_missing_auth(client, db_conn, test_config):
+    test_config.admin_auth_enabled = True
+    ensure_admin_users_schema(db_conn)
+    db_conn.execute(
+        "INSERT INTO admin_users(username, password_hash, is_active) VALUES (?, ?, 1)",
+        ("admin", generate_password_hash("secret")),
+    )
+    db_conn.commit()
+
+    rv = client.get("/export/shortcuts.csv")
+    assert rv.status_code == 302
+    assert rv.headers["Location"].endswith("/")
+
+    rv = client.get("/export/shortcuts.csv", headers=_basic_auth("admin", "wrong"))
+    assert rv.status_code == 302
+    assert rv.headers["Location"].endswith("/")
+
+
+def test_import_shortcuts_redirects_on_post_without_auth(client, db_conn, test_config):
+    test_config.admin_auth_enabled = True
+    ensure_admin_users_schema(db_conn)
+    db_conn.execute(
+        "INSERT INTO admin_users(username, password_hash, is_active) VALUES (?, ?, 1)",
+        ("admin", generate_password_hash("secret")),
+    )
+    db_conn.commit()
+
+    rv = client.post("/import/shortcuts", data={})
+    assert rv.status_code == 302
+    assert rv.headers["Location"].endswith("/")
 
 
 def test_import_shortcuts_csv(client, db_conn):
