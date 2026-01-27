@@ -4,6 +4,7 @@ from flask import render_template, request
 
 from .. import utils
 from ..db import ensure_admin_users_schema, get_db
+from ..logging_setup import configure_logging
 from ..utils import GoConfig, _discover_config_path, load_config
 from . import admin_bp
 
@@ -18,6 +19,8 @@ def _config_to_form_data(cfg: GoConfig) -> dict[str, object]:
         "fallback_url": cfg.fallback_url,
         "file_allow": "\n".join(cfg.file_allow),
         "admin_auth_enabled": cfg.admin_auth_enabled,
+        "log_level": cfg.log_level,
+        "log_file": cfg.log_file,
     }
 
 
@@ -35,6 +38,7 @@ def admin_config():
     message = ""
     save_error = ""
     current_db_path = str(utils.get_db_path())
+    current_log_path = str(utils.get_log_path())
 
     if request.method == "POST":
         host = (request.form.get("host") or "").strip()
@@ -42,6 +46,8 @@ def admin_config():
         fallback_url = (request.form.get("fallback_url") or "").strip()
         file_allow_raw = request.form.get("file_allow") or ""
         file_allow_list = [line.strip() for line in file_allow_raw.splitlines() if line.strip()]
+        log_level = (request.form.get("log_level") or "").strip()
+        log_file = (request.form.get("log_file") or "").strip()
 
         form_values = {
             "host": host or current_cfg.host,
@@ -51,6 +57,8 @@ def admin_config():
             "fallback_url": fallback_url,
             "file_allow": file_allow_raw,
             "admin_auth_enabled": "admin_auth_enabled" in request.form,
+            "log_level": log_level or current_cfg.log_level,
+            "log_file": log_file,
         }
 
         if form_values["admin_auth_enabled"]:
@@ -71,6 +79,8 @@ def admin_config():
             "fallback_url": form_values["fallback_url"],
             "file_allow": file_allow_list,
             "admin_auth_enabled": form_values["admin_auth_enabled"],
+            "log_level": form_values["log_level"],
+            "log_file": form_values["log_file"],
         }
 
         if not save_error:
@@ -90,6 +100,8 @@ def admin_config():
                 load_error = ""
                 message = "Configuration saved."
                 current_db_path = str(utils.get_db_path())
+                current_log_path = str(utils.get_log_path())
+                configure_logging()
 
     return render_template(
         "admin/config.html",
@@ -98,4 +110,5 @@ def admin_config():
         save_error=save_error,
         message=message,
         db_path=current_db_path,
+        log_path=current_log_path,
     )

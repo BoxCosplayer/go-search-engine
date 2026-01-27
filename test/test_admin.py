@@ -59,6 +59,8 @@ def test_admin_config_get_and_post(client, db_conn):
         "admin_auth_enabled": "on",
         "fallback_url": "https://duck.example/?q={q}",
         "file_allow": "/data\n/tmp",
+        "log_level": "WARNING",
+        "log_file": "/data/go-search.log",
     }
     rv = client.post("/admin/config", data=data, follow_redirects=True)
     assert rv.status_code == 200
@@ -69,6 +71,8 @@ def test_admin_config_get_and_post(client, db_conn):
     assert blob["port"] == 6000
     assert blob["file-allow"] == ["/data", "/tmp"]
     assert blob["admin-auth-enabled"] is True
+    assert blob["log-level"] == "WARNING"
+    assert blob["log-file"] == "/data/go-search.log"
     assert "db-path" not in blob
 
 
@@ -82,6 +86,8 @@ def test_admin_config_rejects_auth_without_users(client):
         "admin_auth_enabled": "on",
         "fallback_url": "https://duck.example/?q={q}",
         "file_allow": "/data\n/tmp",
+        "log_level": "INFO",
+        "log_file": "",
     }
     rv = client.post("/admin/config", data=data, follow_redirects=True)
     assert rv.status_code == 200

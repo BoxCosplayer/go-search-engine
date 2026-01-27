@@ -37,6 +37,9 @@ function Initialize-Config {
             'allow-files'  = $false
             'fallback-url' = ''
             'file-allow'   = @()
+            'admin-auth-enabled' = $false
+            'log-level'    = 'INFO'
+            'log-file'     = 'C:\data\go-search-engine.log'
         }
         $default | ConvertTo-Json -Depth 4 | Set-Content -Path $ConfigPath -Encoding utf8NoBOM
         return
@@ -65,6 +68,12 @@ function Initialize-Config {
     }
     if (-not $json.'file-allow') {
         $json.'file-allow' = @()
+    }
+    if (-not $json.'log-level') {
+        $json.'log-level' = 'INFO'
+    }
+    if (-not $json.'log-file') {
+        $json.'log-file' = 'C:\data\go-search-engine.log'
     }
 
     if ($json.PSObject.Properties['db-path']) {
@@ -108,6 +117,22 @@ function Update-ConfigFromEnv {
             $cfg.port = $desiredPort
             $writeBack = $true
         }
+    }
+    if (-not $cfg.'log-level') {
+        $cfg.'log-level' = 'INFO'
+        $writeBack = $true
+    }
+    if (-not $cfg.'log-file') {
+        $cfg.'log-file' = 'C:\data\go-search-engine.log'
+        $writeBack = $true
+    }
+    if ($env:GO_LOG_PATH -and $cfg.'log-file' -ne $env:GO_LOG_PATH) {
+        $cfg.'log-file' = $env:GO_LOG_PATH
+        $writeBack = $true
+    }
+    if ($env:GO_LOG_LEVEL -and $cfg.'log-level' -ne $env:GO_LOG_LEVEL) {
+        $cfg.'log-level' = $env:GO_LOG_LEVEL
+        $writeBack = $true
     }
     if ($writeBack) {
         $cfg | ConvertTo-Json -Depth 6 | Set-Content -Path $ConfigPath -Encoding utf8NoBOM

@@ -2,6 +2,10 @@
 
 ## [Major Versions Log](#major-versions-log)
 
+## 1.2.2 - 28/01/2026
+
+- Added configurable logging with API usage and file access events
+
 ## 1.2.1 - 28/01/2026
 
 - Redirect unauthenticated API access to the home page (except bootstrap)
@@ -195,7 +199,7 @@
 
 # Major Versions Log
 
-- 1.2 - Lock admin actions behind authentication
+- 1.2 - Security Improvements
 - 1.1 - Publication & QoL updates
 - **1.0** - Reworked documentation
 

@@ -6,8 +6,9 @@ import sqlite3
 from contextlib import suppress
 from html import escape
 from io import StringIO
+from time import perf_counter
 
-from flask import Blueprint, Response, abort, redirect, request, url_for
+from flask import Blueprint, Response, abort, g, redirect, request, url_for
 from werkzeug.exceptions import BadRequest, HTTPException
 
 from ..db import ensure_lists_schema, get_db, init_db
@@ -15,6 +16,28 @@ from ..utils import sanitize_query, to_slug
 
 api_bp = Blueprint("api", __name__)
 logger = logging.getLogger(__name__)
+
+
+@api_bp.before_request
+def _api_log_start():
+    g._api_log_start = perf_counter()
+
+
+@api_bp.after_request
+def _api_log_end(response):
+    start = getattr(g, "_api_log_start", None)
+    elapsed_ms = (perf_counter() - start) * 1000 if start else 0.0
+    path = request.full_path.rstrip("?")
+    remote = request.remote_addr or "unknown"
+    logger.info(
+        "API %s %s %s %.1fms remote=%s",
+        request.method,
+        path,
+        response.status_code,
+        elapsed_ms,
+        remote,
+    )
+    return response
 
 
 def _get_json_object():

@@ -5,5 +5,7 @@
     "allow-files": false,
     "fallback-url": "https://duckduckgo.com/?q={q}",
     "file-allow": [],
-    "admin-auth-enabled": false
+    "admin-auth-enabled": false,
+    "log-level": "INFO",
+    "log-file": ""
 }

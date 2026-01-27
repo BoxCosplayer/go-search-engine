@@ -43,9 +43,12 @@ from .api import (
 from .db import DB_PATH, ensure_lists_schema, ensure_search_flag_column, get_db
 from .db import init_app as db_init_app
 from .lists import lists_bp
+from .logging_setup import configure_logging
 from .utils import (
     config,
     file_url_to_path,
+    get_log_level,
+    get_log_path,
     is_allowed_path,
     open_path_with_os,
     sanitize_query,
@@ -68,6 +71,24 @@ except Exception:  # pragma: no cover
     ImageFont = None  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
+
+_logging_configured = False
+_logging_log_path = ""
+_logging_log_level = ""
+
+
+def _ensure_logging():
+    global _logging_configured
+    global _logging_log_level
+    global _logging_log_path
+    current_path = str(get_log_path())
+    current_level = get_log_level().strip().upper()
+    if not _logging_configured or current_path != _logging_log_path or current_level != _logging_log_level:
+        configure_logging()
+        _logging_configured = True
+        _logging_log_path = current_path
+        _logging_log_level = current_level
+
 
 # 64x64 simple dark badge with "go"
 HOST = config.host
@@ -340,6 +361,11 @@ app = Flask(__name__, template_folder=_TEMPLATES_DIR)
 db_init_app(app)
 
 
+@app.before_request
+def _configure_logging_once():
+    _ensure_logging()
+
+
 def _admin_only(view_func):
     @wraps(view_func)
     def _wrapped(*args, **kwargs):
@@ -366,28 +392,38 @@ def _redirect_to_url(url: str):
         return redirect(url, code=302)
 
     if url.startswith("file://"):
+        remote = request.remote_addr or "unknown"
         try:
             path = file_url_to_path(url)
         except Exception as e:
+            logger.warning("File access rejected (bad URL) url=%s remote=%s err=%s", url, remote, e)
             return (f"Bad file URL: {e}", 400)
 
-        if request.host.split(":")[0] not in ("127.0.0.1", "localhost") and not ALLOW_FILES:
+        logger.info("File access requested path=%s remote=%s", path, remote)
+
+        host = request.host.split(":")[0]
+        if host not in ("127.0.0.1", "localhost") and not ALLOW_FILES:
+            logger.warning("File access blocked (non-local host) host=%s path=%s remote=%s", host, path, remote)
             return (
                 "Refusing to open local files over non-localhost. Bind to 127.0.0.1 or set ALLOW_FILES.",
                 403,
             )
 
         if not is_allowed_path(path):
+            logger.warning("File access blocked (path not allowed) path=%s remote=%s", path, remote)
             return ("Path not allowed. Set ALLOW_FILES to include this directory.", 403)
 
         if not os.path.exists(path):
+            logger.warning("File access failed (missing) path=%s remote=%s", path, remote)
             return (f"File/folder not found: {path}", 404)
 
         try:
             open_path_with_os(path)
         except Exception as e:
+            logger.exception("File access failed (open error) path=%s remote=%s", path, remote)
             return (f"Failed to open: {e}", 500)
 
+        logger.info("File access opened path=%s remote=%s", path, remote)
         return render_template("file_open.html", path=path), 200
 
     return redirect(url, code=302)
@@ -589,6 +625,7 @@ def go():
 
 
 if __name__ == "__main__":  # pragma: no cover
+    _ensure_logging()
     base_dir = os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else os.path.dirname(__file__)
     Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(DB_PATH) as db:

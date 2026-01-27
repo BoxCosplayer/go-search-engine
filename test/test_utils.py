@@ -53,6 +53,12 @@ def test_default_db_path_linux(monkeypatch, tmp_path):
     assert utils._default_db_path() == expected
 
 
+def test_default_log_path_uses_user_dir(monkeypatch, tmp_path):
+    data_dir = tmp_path / "appdata"
+    monkeypatch.setattr(utils, "_user_data_dir", lambda: data_dir)
+    assert utils._default_log_path() == data_dir / "go-search-engine.log"
+
+
 def test_get_db_path_defaults_to_user_dir(monkeypatch, fake_db_default):
     monkeypatch.delenv("GO_DB_PATH", raising=False)
     assert utils.get_db_path() == fake_db_default
@@ -69,6 +75,76 @@ def test_get_db_path_resolves_relative_env(monkeypatch, tmp_path):
     monkeypatch.setattr(utils, "runtime_base_dir", lambda: tmp_path)
     expected = (tmp_path / "data" / "links.db").resolve()
     assert utils.get_db_path() == expected
+
+
+def test_get_log_path_honors_absolute_env(monkeypatch, tmp_path):
+    target = tmp_path / "custom" / "go-search.log"
+    monkeypatch.setenv("GO_LOG_PATH", str(target))
+    assert utils.get_log_path() == target.resolve()
+
+
+def test_get_log_path_resolves_relative_env(monkeypatch, tmp_path):
+    monkeypatch.setenv("GO_LOG_PATH", "logs/go.log")
+    monkeypatch.setattr(utils, "runtime_base_dir", lambda: tmp_path)
+    expected = (tmp_path / "logs" / "go.log").resolve()
+    assert utils.get_log_path() == expected
+
+
+def test_get_log_path_uses_config_value(monkeypatch, tmp_path):
+    monkeypatch.delenv("GO_LOG_PATH", raising=False)
+    cfg = utils.GoConfig(
+        host="127.0.0.1",
+        port=5000,
+        debug=False,
+        allow_files=False,
+        fallback_url="",
+        file_allow=[],
+        admin_auth_enabled=False,
+        log_level="INFO",
+        log_file=str(tmp_path / "app.log"),
+    )
+    monkeypatch.setattr(utils, "config", cfg, raising=False)
+    assert utils.get_log_path() == (tmp_path / "app.log").resolve()
+
+
+def test_get_log_path_defaults_to_user_dir(monkeypatch, tmp_path):
+    monkeypatch.delenv("GO_LOG_PATH", raising=False)
+    monkeypatch.setattr(utils, "_default_log_path", lambda: tmp_path / "default.log")
+    cfg = utils.GoConfig(
+        host="127.0.0.1",
+        port=5000,
+        debug=False,
+        allow_files=False,
+        fallback_url="",
+        file_allow=[],
+        admin_auth_enabled=False,
+        log_level="INFO",
+        log_file="",
+    )
+    monkeypatch.setattr(utils, "config", cfg, raising=False)
+    assert utils.get_log_path() == tmp_path / "default.log"
+
+
+def test_get_log_level_env_override(monkeypatch):
+    monkeypatch.setenv("GO_LOG_LEVEL", "warning")
+    assert utils.get_log_level() == "warning"
+
+
+def test_get_log_level_defaults_to_info(monkeypatch):
+    monkeypatch.delenv("GO_LOG_LEVEL", raising=False)
+    cfg = utils.GoConfig(
+        host="127.0.0.1",
+        port=5000,
+        debug=False,
+        allow_files=False,
+        fallback_url="",
+        file_allow=[],
+        admin_auth_enabled=False,
+        log_level="",
+        log_file="",
+    )
+    monkeypatch.setattr(utils, "config", cfg, raising=False)
+    assert utils.get_log_level() == "INFO"
 
 
 def test_sanitize_query_normalizes_quotes_and_trailing_chars():
