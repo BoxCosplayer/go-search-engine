@@ -1,3 +1,6 @@
+from backend.app import api
+
+
 def test_links_endpoint_lists_existing(client):
     rv = client.get("/api/links")
     assert rv.status_code == 200
@@ -205,3 +208,13 @@ def test_list_links_error_paths(client):
 
     rv = client.get("/api/lists/ghost/links")
     assert rv.status_code == 404
+
+
+def test_healthz_error_path(client, monkeypatch):
+    def fail():
+        raise RuntimeError("db down")
+
+    monkeypatch.setattr(api, "get_db", fail)
+    rv = client.get("/healthz")
+    assert rv.status_code == 500
+    assert rv.get_json()["status"] == "error"

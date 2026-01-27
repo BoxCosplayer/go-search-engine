@@ -3,6 +3,7 @@ import logging
 import os
 import re
 import shutil
+import string
 import subprocess  # nosec B404
 import sys
 from pathlib import Path
@@ -94,7 +95,7 @@ _DEFAULT_CONFIG = {
     "fallback-url": "",
     "file-allow": [],
 }
-_TRAILING_PUNCT_RE = re.compile(r"[\s'\"`#@)\]\},.!?:;]+$")
+_TRAILING_PUNCT_CHARS = string.whitespace + "'\"`#@)]},.!?:;"
 
 
 def sanitize_query(raw: str) -> str:
@@ -104,7 +105,7 @@ def sanitize_query(raw: str) -> str:
     q = raw.strip()
     if (len(q) >= 2) and ((q[0], q[-1]) in {('"', '"'), ("'", "'"), ("`", "`")}):
         q = q[1:-1].strip()
-    return _TRAILING_PUNCT_RE.sub("", q)
+    return q.rstrip(_TRAILING_PUNCT_CHARS)
 
 
 def to_slug(s: str) -> str:

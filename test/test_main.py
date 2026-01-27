@@ -552,6 +552,12 @@ def test_extract_search_template_variants():
     assert main._extract_search_template(doc_no_match) is None
 
 
+def test_strip_optional_placeholders_variants():
+    assert main._strip_optional_placeholders("plain") == "plain"
+    template = "{keep} {drop?} trailing{"
+    assert main._strip_optional_placeholders(template) == "{keep}  trailing{"
+
+
 def test_build_search_url_requires_placeholder():
     assert main._build_search_url("https://example.com/opensearch.xml", "/search", "cats") is None
 
@@ -637,13 +643,3 @@ def test_go_exact_redirect_other_scheme(client, db_conn):
     add_link(db_conn, "mailto", "mailto:test@example.com", "Email")
     rv = client.get("/go", query_string={"q": "mailto"})
     assert rv.status_code == 302
-
-
-def test_healthz_error_path(client, monkeypatch):
-    def fail():
-        raise RuntimeError("db down")
-
-    monkeypatch.setattr(main, "get_db", fail)
-    rv = client.get("/healthz")
-    assert rv.status_code == 500
-    assert rv.get_json()["status"] == "error"
