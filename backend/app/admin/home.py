@@ -1,12 +1,12 @@
 from flask import render_template, request
+from werkzeug.exceptions import HTTPException
 
 from ..db import ensure_lists_schema, get_db
 from . import admin_bp
 
 
-@admin_bp.route("/")
-def admin_home():
-    """Render the Admin home page."""
+def _render_admin_home(error_message: str | None = None):
+    """Render the Admin home page with optional error messaging."""
     db = get_db()
     ensure_lists_schema(db)
     rows = db.execute(
@@ -35,4 +35,21 @@ def admin_home():
         rows=rows,
         all_lists=all_lists,
         edit_row=dict(edit_row) if edit_row else None,
+        error_message=error_message,
     )
+
+
+def admin_error(message: str, status_code: int = 400):
+    """Return the admin home page with a surfaced error message."""
+    return _render_admin_home(error_message=message), status_code
+
+
+@admin_bp.errorhandler(HTTPException)
+def _handle_admin_http_error(err):
+    return admin_error(err.description or err.name, err.code)
+
+
+@admin_bp.route("/")
+def admin_home():
+    """Render the Admin home page."""
+    return _render_admin_home()

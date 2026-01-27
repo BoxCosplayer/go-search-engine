@@ -49,6 +49,16 @@ def test_links_post_validation_errors(client):
     assert rv.status_code == 400
 
 
+def test_links_post_requires_json_object(client):
+    rv = client.post("/api/links", data="nope")
+    assert rv.status_code == 400
+    assert rv.get_json()["error"] == "Expected application/json"
+
+    rv = client.post("/api/links", json=["nope"])
+    assert rv.status_code == 400
+    assert rv.get_json()["error"] == "JSON object required"
+
+
 def test_links_post_duplicate_error(client):
     payload = {"keyword": "gh", "url": "https://github.com"}
     client.post("/api/links", json=payload)
@@ -218,3 +228,13 @@ def test_healthz_error_path(client, monkeypatch):
     rv = client.get("/healthz")
     assert rv.status_code == 500
     assert rv.get_json()["status"] == "error"
+
+
+def test_api_unexpected_error_returns_json(client, monkeypatch):
+    def fail():
+        raise RuntimeError("db down")
+
+    monkeypatch.setattr(api, "get_db", fail)
+    rv = client.get("/api/links")
+    assert rv.status_code == 500
+    assert rv.get_json() == {"error": "internal server error"}

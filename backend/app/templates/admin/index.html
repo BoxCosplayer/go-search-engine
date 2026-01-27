@@ -247,6 +247,20 @@
       filter: brightness(1.08)
     }
 
+    .flash {
+      margin: 0 0 1rem;
+      padding: .75rem 1rem;
+      border-radius: 8px;
+      border: 1px solid;
+      text-align: left;
+    }
+
+    .flash.error {
+      border-color: rgba(248, 81, 73, .4);
+      background: rgba(248, 81, 73, .15);
+      color: #ffb4ae;
+    }
+
     .danger {
       background: var(--danger);
       color: #fff
@@ -498,6 +512,9 @@
         <a class="action-pill config-link" href="/admin/config">Manage config</a>
       </div>
     </div>
+    {% if error_message %}
+    <div class="flash error">{{ error_message }}</div>
+    {% endif %}
     <form id="importCsvForm" action="{{ url_for('import_shortcuts_csv') }}" method="post" enctype="multipart/form-data"
       style="display:none;">
       <input id="importCsvFile" type="file" name="file" accept=".csv">

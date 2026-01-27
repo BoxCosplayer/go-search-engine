@@ -1,9 +1,10 @@
 import sqlite3
 
-from flask import abort, redirect, request
+from flask import redirect, request
 
 from ..db import ensure_lists_schema, get_db, init_db
 from . import admin_bp
+from .home import admin_error
 
 
 @admin_bp.route("/add", methods=["POST"])
@@ -15,9 +16,9 @@ def admin_add():
     search_enabled = int(bool(request.form.get("search_enabled")))
 
     if not keyword or not url:
-        abort(400, "Keyword and URL required")
+        return admin_error("Keyword and URL required", 400)
     if any(ch.isspace() for ch in keyword):
-        abort(400, "Keyword cannot contain whitespace")
+        return admin_error("Keyword cannot contain whitespace", 400)
 
     db = get_db()
     init_db()
@@ -29,7 +30,7 @@ def admin_add():
         )
         db.commit()
     except Exception:
-        abort(400, f"Keyword '{keyword}' already exists")
+        return admin_error(f"Keyword '{keyword}' already exists", 400)
     return redirect("/admin")
 
 
@@ -38,7 +39,7 @@ def admin_delete():
     """Delete an existing link by keyword."""
     keyword = (request.form.get("keyword") or "").strip()
     if not keyword:
-        abort(400, "Keyword required")
+        return admin_error("Keyword required", 400)
     db = get_db()
     db.execute("DELETE FROM links WHERE lower(keyword) = lower(?)", (keyword,))
     db.commit()
@@ -55,14 +56,14 @@ def admin_update():
     search_enabled = int(bool(request.form.get("search_enabled")))
 
     if not original or not keyword or not url:
-        abort(400, "original_keyword, keyword and url are required")
+        return admin_error("original_keyword, keyword and url are required", 400)
     if any(ch.isspace() for ch in keyword):
-        abort(400, "Keyword cannot contain whitespace")
+        return admin_error("Keyword cannot contain whitespace", 400)
 
     db = get_db()
     row = db.execute("SELECT id FROM links WHERE lower(keyword)=lower(?)", (original,)).fetchone()
     if not row:
-        abort(404, "link not found")
+        return admin_error("link not found", 404)
 
     try:
         db.execute(
@@ -71,6 +72,6 @@ def admin_update():
         )
         db.commit()
     except sqlite3.IntegrityError:
-        abort(400, f"Keyword '{keyword}' already exists")
+        return admin_error(f"Keyword '{keyword}' already exists", 400)
 
     return redirect(f"/admin?q={keyword}")

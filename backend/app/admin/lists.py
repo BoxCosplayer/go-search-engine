@@ -1,11 +1,12 @@
 import sqlite3
 from contextlib import suppress
 
-from flask import abort, redirect, request
+from flask import redirect, request
 
 from ..db import ensure_lists_schema, get_db
 from ..utils import to_slug
 from . import admin_bp
+from .home import admin_error
 
 
 @admin_bp.route("/list-add", methods=["POST"])
@@ -17,7 +18,7 @@ def admin_list_add():
     slug = (request.form.get("slug") or "").strip()
     desc = (request.form.get("description") or "").strip() or None
     if not name and not slug:
-        abort(400, "name or slug required")
+        return admin_error("name or slug required", 400)
     if not slug:
         slug = to_slug(name)
     if not name:
@@ -26,7 +27,7 @@ def admin_list_add():
         db.execute("INSERT INTO lists(slug, name, description) VALUES (?, ?, ?)", (slug, name, desc))
         db.commit()
     except sqlite3.IntegrityError:
-        abort(400, f"List '{slug}' already exists")
+        return admin_error(f"List '{slug}' already exists", 400)
 
     base_url = request.host_url.rstrip("/")
     list_url = f"{base_url}/lists/{slug}"
@@ -48,7 +49,7 @@ def admin_set_lists():
 
     link = db.execute("SELECT id FROM links WHERE lower(keyword)=lower(?)", (keyword,)).fetchone()
     if not link:
-        abort(404, "link not found")
+        return admin_error("link not found", 404)
     link_id = link["id"]
 
     slugs = [s.strip().lower() for s in slugs_raw.split(",") if s.strip()]
@@ -89,10 +90,10 @@ def admin_list_delete():
     ensure_lists_schema(db)
     slug = (request.form.get("slug") or "").strip()
     if not slug:
-        abort(400, "missing slug")
+        return admin_error("missing slug", 400)
     row = db.execute("SELECT id, slug FROM lists WHERE lower(slug)=lower(?)", (slug,)).fetchone()
     if not row:
-        abort(404, "list not found")
+        return admin_error("list not found", 404)
     db.execute("DELETE FROM lists WHERE id=?", (row["id"],))
     db.execute("DELETE FROM links WHERE lower(keyword)=lower(?)", (row["slug"],))
     db.commit()
