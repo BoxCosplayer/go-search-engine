@@ -3,8 +3,8 @@ import json
 
 from backend.app.admin import config_routes
 from backend.app.admin import home as admin_home
-from werkzeug.exceptions import BadRequest
 from backend.app.db import ensure_admin_users_schema
+from werkzeug.exceptions import BadRequest
 from werkzeug.security import generate_password_hash
 
 
