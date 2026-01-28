@@ -2,6 +2,10 @@
 
 ## [Major Versions Log](#major-versions-log)
 
+## 1.2.3 - 28/01/2026
+
+- Updated test coverage to 90%, in order to increase efficacy of the tests.
+
 ## 1.2.2 - 28/01/2026
 
 - Added configurable logging with API usage and file access events

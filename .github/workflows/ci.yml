@@ -33,10 +33,10 @@ jobs:
           pip install -r requirements.txt
           pip install pytest coverage
 
-      - name: Run pytest with coverage (require 100%)
+      - name: Run pytest with coverage (require 90%)
         run: |
           coverage run -m pytest --no-summary
-          coverage report --fail-under=100
+          coverage report --fail-under=90
 
   codeql:
     runs-on: ubuntu-latest

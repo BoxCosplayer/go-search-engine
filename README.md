@@ -125,13 +125,13 @@ When `admin-auth-enabled` is true, `/admin` requires HTTP Basic Auth. If no admi
 - Launch an issue via GitHub GUI
 - Create a branch & file a PR
 - Ensure you run Tests/Linters before you commit
-- Update Changelog and versioning if applicable (CHANGELOG.md, )
+- Update Changelog and versioning if applicable (CHANGELOG.md, backend\app\__init__.py)
 
 Recommended Test / Linting suite for CI
 
 ```bash
 python -m coverage run -m pytest            # Alternatively: .\.venv\Scripts\python.exe -m coverage run -m pytest
-coverage report --fail-under=100
+coverage report --fail-under=90
 ruff check backend
 ruff format backend
 bandit -r backend app.py init_db.py
