@@ -2,7 +2,7 @@ import sqlite3
 
 from flask import redirect, request
 
-from ..db import ensure_lists_schema, get_db, init_db
+from ..db import get_db
 from . import admin_bp
 from .home import admin_error
 
@@ -21,8 +21,6 @@ def admin_add():
         return admin_error("Keyword cannot contain whitespace", 400)
 
     db = get_db()
-    init_db()
-    ensure_lists_schema(db)
     try:
         db.execute(
             "INSERT INTO links(keyword, url, title, search_enabled) VALUES (?, ?, ?, ?)",
@@ -41,7 +39,7 @@ def admin_delete():
     if not keyword:
         return admin_error("Keyword required", 400)
     db = get_db()
-    db.execute("DELETE FROM links WHERE lower(keyword) = lower(?)", (keyword,))
+    db.execute("DELETE FROM links WHERE keyword COLLATE NOCASE = ?", (keyword,))
     db.commit()
     return redirect("/admin")
 
@@ -61,7 +59,10 @@ def admin_update():
         return admin_error("Keyword cannot contain whitespace", 400)
 
     db = get_db()
-    row = db.execute("SELECT id FROM links WHERE lower(keyword)=lower(?)", (original,)).fetchone()
+    row = db.execute(
+        "SELECT id FROM links WHERE keyword COLLATE NOCASE = ?",
+        (original,),
+    ).fetchone()
     if not row:
         return admin_error("link not found", 404)
 

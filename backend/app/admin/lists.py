@@ -3,7 +3,7 @@ from contextlib import suppress
 
 from flask import redirect, request
 
-from ..db import ensure_lists_schema, get_db
+from ..db import get_db
 from ..utils import to_slug
 from . import admin_bp
 from .home import admin_error
@@ -13,7 +13,6 @@ from .home import admin_error
 def admin_list_add():
     """Create a new list and a corresponding shortcut link."""
     db = get_db()
-    ensure_lists_schema(db)
     name = (request.form.get("name") or "").strip()
     slug = (request.form.get("slug") or "").strip()
     desc = (request.form.get("description") or "").strip() or None
@@ -43,11 +42,13 @@ def admin_list_add():
 def admin_set_lists():
     """Update a link's associated lists (CSV of slugs)."""
     db = get_db()
-    ensure_lists_schema(db)
     keyword = (request.form.get("keyword") or "").strip()
     slugs_raw = (request.form.get("slugs") or "").strip()
 
-    link = db.execute("SELECT id FROM links WHERE lower(keyword)=lower(?)", (keyword,)).fetchone()
+    link = db.execute(
+        "SELECT id FROM links WHERE keyword COLLATE NOCASE = ?",
+        (keyword,),
+    ).fetchone()
     if not link:
         return admin_error("link not found", 404)
     link_id = link["id"]
@@ -57,7 +58,10 @@ def admin_set_lists():
 
     new_lists = []
     for slug in slugs:
-        row = db.execute("SELECT id FROM lists WHERE slug=?", (slug,)).fetchone()
+        row = db.execute(
+            "SELECT id FROM lists WHERE slug COLLATE NOCASE = ?",
+            (slug,),
+        ).fetchone()
         if not row:
             name = slug.replace("-", " ").title()
             db.execute("INSERT INTO lists(slug, name) VALUES (?, ?)", (slug, name))
@@ -77,7 +81,10 @@ def admin_set_lists():
 
     db.execute("DELETE FROM link_lists WHERE link_id=?", (link_id,))
     for slug in slugs:
-        list_id = db.execute("SELECT id FROM lists WHERE slug=?", (slug,)).fetchone()["id"]
+        list_id = db.execute(
+            "SELECT id FROM lists WHERE slug COLLATE NOCASE = ?",
+            (slug,),
+        ).fetchone()["id"]
         db.execute("INSERT OR IGNORE INTO link_lists(link_id, list_id) VALUES (?, ?)", (link_id, list_id))
     db.commit()
     return redirect("/admin")
@@ -87,14 +94,16 @@ def admin_set_lists():
 def admin_list_delete():
     """Delete a list by slug and redirect to the lists index."""
     db = get_db()
-    ensure_lists_schema(db)
     slug = (request.form.get("slug") or "").strip()
     if not slug:
         return admin_error("missing slug", 400)
-    row = db.execute("SELECT id, slug FROM lists WHERE lower(slug)=lower(?)", (slug,)).fetchone()
+    row = db.execute(
+        "SELECT id, slug FROM lists WHERE slug COLLATE NOCASE = ?",
+        (slug,),
+    ).fetchone()
     if not row:
         return admin_error("list not found", 404)
     db.execute("DELETE FROM lists WHERE id=?", (row["id"],))
-    db.execute("DELETE FROM links WHERE lower(keyword)=lower(?)", (row["slug"],))
+    db.execute("DELETE FROM links WHERE keyword COLLATE NOCASE = ?", (row["slug"],))
     db.commit()
     return redirect("/lists")

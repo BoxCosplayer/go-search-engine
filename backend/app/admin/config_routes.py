@@ -3,7 +3,7 @@ import json
 from flask import render_template, request
 
 from .. import utils
-from ..db import ensure_admin_users_schema, get_db
+from ..db import get_db
 from ..logging_setup import configure_logging
 from ..utils import GoConfig, _discover_config_path, load_config
 from . import admin_bp
@@ -63,7 +63,6 @@ def admin_config():
 
         if form_values["admin_auth_enabled"]:
             db = get_db()
-            ensure_admin_users_schema(db)
             row = db.execute("SELECT COUNT(*) AS c FROM admin_users").fetchone()
             if not row or row["c"] == 0:
                 save_error = (

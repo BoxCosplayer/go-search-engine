@@ -11,7 +11,7 @@ from time import perf_counter
 from flask import Blueprint, Response, abort, g, redirect, request, url_for
 from werkzeug.exceptions import BadRequest, HTTPException
 
-from ..db import ensure_lists_schema, get_db, init_db
+from ..db import get_db
 from ..utils import sanitize_query, to_slug
 
 api_bp = Blueprint("api", __name__)
@@ -141,11 +141,11 @@ def _import_shortcuts_from_csv(db, file_storage):
         search_enabled = 1 if raw_flag in {"1", "true", "yes", "y", "on"} else 0
 
         existing_keyword = db.execute(
-            "SELECT id FROM links WHERE lower(keyword)=lower(?)",
+            "SELECT id FROM links WHERE keyword COLLATE NOCASE = ?",
             (keyword,),
         ).fetchone()
         existing_url = db.execute(
-            "SELECT id FROM links WHERE lower(url)=lower(?)",
+            "SELECT id FROM links WHERE url COLLATE NOCASE = ?",
             (url,),
         ).fetchone()
 
@@ -172,7 +172,7 @@ def _import_shortcuts_from_csv(db, file_storage):
             inserted += 1
 
         duplicates = db.execute(
-            "SELECT id FROM links WHERE lower(url)=lower(?) AND id <> ?",
+            "SELECT id FROM links WHERE url COLLATE NOCASE = ? AND id <> ?",
             (url, link_id),
         ).fetchall()
         for duplicate in duplicates:
@@ -183,7 +183,7 @@ def _import_shortcuts_from_csv(db, file_storage):
         list_ids: list[int] = []
         for slug in slugs:
             list_row = db.execute(
-                "SELECT id FROM lists WHERE lower(slug)=lower(?)",
+                "SELECT id FROM lists WHERE slug COLLATE NOCASE = ?",
                 (slug,),
             ).fetchone()
             if list_row:
@@ -239,8 +239,6 @@ def links():
             abort(400, "keyword cannot contain whitespace")
         if not (url.startswith("http://") or url.startswith("https://")):
             abort(400, "url must start with http:// or https://")
-        init_db()
-        ensure_lists_schema(get_db())
         try:
             db.execute(
                 "INSERT INTO links(keyword, url, title, search_enabled) VALUES (?, ?, ?, ?)",
@@ -262,7 +260,7 @@ def get_link(keyword: str):
     """Return details for a single link (case-insensitive keyword lookup)."""
     db = get_db()
     row = db.execute(
-        "SELECT keyword, title, url, search_enabled FROM links WHERE lower(keyword)=lower(?)",
+        "SELECT keyword, title, url, search_enabled FROM links WHERE keyword COLLATE NOCASE = ?",
         (keyword,),
     ).fetchone()
     if not row:
@@ -275,7 +273,7 @@ def update_link(keyword: str):
     """Update an existing link."""
     db = get_db()
     row = db.execute(
-        "SELECT id, keyword, title, url, search_enabled FROM links WHERE lower(keyword)=lower(?)",
+        "SELECT id, keyword, title, url, search_enabled FROM links WHERE keyword COLLATE NOCASE = ?",
         (keyword,),
     ).fetchone()
     if not row:
@@ -322,7 +320,7 @@ def delete_link(keyword: str):
     """Delete a link by keyword (case-insensitive)."""
     db = get_db()
     row = db.execute(
-        "SELECT id FROM links WHERE lower(keyword)=lower(?)",
+        "SELECT id FROM links WHERE keyword COLLATE NOCASE = ?",
         (keyword,),
     ).fetchone()
     if not row:
@@ -352,7 +350,6 @@ def lists():
         fails.
     """
     db = get_db()
-    ensure_lists_schema(db)
     if request.method == "POST":
         data = _get_json_object()
         slug = (data.get("slug") or "").strip()
@@ -388,9 +385,8 @@ def lists():
 def list_detail(slug: str):
     """CRUD operations for a single list (case-insensitive slug lookup)."""
     db = get_db()
-    ensure_lists_schema(db)
     info = db.execute(
-        "SELECT id, slug, name, description FROM lists WHERE lower(slug)=lower(?)",
+        "SELECT id, slug, name, description FROM lists WHERE slug COLLATE NOCASE = ?",
         (slug,),
     ).fetchone()
 
@@ -442,7 +438,7 @@ def list_detail(slug: str):
             list_url = f"{base_url}/lists/{new_slug}"
             title = f"List - {new_name}"
             db.execute(
-                "UPDATE links SET keyword=?, url=?, title=? WHERE lower(keyword)=lower(?)",
+                "UPDATE links SET keyword=?, url=?, title=? WHERE keyword COLLATE NOCASE = ?",
                 (new_slug, list_url, title, slug),
             )
             db.commit()
@@ -461,7 +457,7 @@ def list_detail(slug: str):
         abort(404, "list not found")  # pragma: no cover
     db.execute("DELETE FROM lists WHERE id=?", (info["id"],))
     with suppress(Exception):
-        db.execute("DELETE FROM links WHERE lower(keyword)=lower(?)", (slug,))
+        db.execute("DELETE FROM links WHERE keyword COLLATE NOCASE = ?", (slug,))
     db.commit()
     return {"ok": True}
 
@@ -470,9 +466,8 @@ def list_detail(slug: str):
 def list_links(slug: str):
     """List or append links within a list."""
     db = get_db()
-    ensure_lists_schema(db)
     info = db.execute(
-        "SELECT id FROM lists WHERE lower(slug)=lower(?)",
+        "SELECT id FROM lists WHERE slug COLLATE NOCASE = ?",
         (slug,),
     ).fetchone()
     if not info:
@@ -496,7 +491,7 @@ def list_links(slug: str):
     if not keyword:
         abort(400, "keyword required")
     link = db.execute(
-        "SELECT id FROM links WHERE lower(keyword)=lower(?)",
+        "SELECT id FROM links WHERE keyword COLLATE NOCASE = ?",
         (keyword,),
     ).fetchone()
     if not link:
@@ -513,15 +508,14 @@ def list_links(slug: str):
 def remove_list_link(slug: str, keyword: str):
     """Remove a link from a list."""
     db = get_db()
-    ensure_lists_schema(db)
     info = db.execute(
-        "SELECT id FROM lists WHERE lower(slug)=lower(?)",
+        "SELECT id FROM lists WHERE slug COLLATE NOCASE = ?",
         (slug,),
     ).fetchone()
     if not info:
         abort(404, "list not found")
     link = db.execute(
-        "SELECT id FROM links WHERE lower(keyword)=lower(?)",
+        "SELECT id FROM links WHERE keyword COLLATE NOCASE = ?",
         (keyword,),
     ).fetchone()
     if not link:
@@ -554,7 +548,6 @@ def healthz():
 def export_shortcuts_csv():
     """Download all shortcuts as a CSV attachment."""
     db = get_db()
-    ensure_lists_schema(db)
     rows = _select_links_with_lists(db)
 
     buffer = StringIO()
@@ -585,7 +578,6 @@ def import_shortcuts_csv():
     uploaded.stream.seek(0, os.SEEK_SET)
 
     db = get_db()
-    ensure_lists_schema(db)
     _import_shortcuts_from_csv(db, uploaded)
     db.commit()
     return redirect(url_for("index"))

@@ -1,14 +1,13 @@
 from flask import render_template, request
 from werkzeug.exceptions import HTTPException
 
-from ..db import ensure_lists_schema, get_db
+from ..db import get_db
 from . import admin_bp
 
 
 def _render_admin_home(error_message: str | None = None):
     """Render the Admin home page with optional error messaging."""
     db = get_db()
-    ensure_lists_schema(db)
     rows = db.execute(
         """
         SELECT l.id, l.keyword, l.title, l.url, l.search_enabled,
@@ -25,7 +24,7 @@ def _render_admin_home(error_message: str | None = None):
     edit_row = None
     if edit_key:
         edit_row = db.execute(
-            "SELECT keyword, title, url, search_enabled FROM links WHERE lower(keyword)=lower(?)",
+            "SELECT keyword, title, url, search_enabled FROM links WHERE keyword COLLATE NOCASE = ?",
             (edit_key,),
         ).fetchone()
 
