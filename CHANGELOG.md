@@ -2,6 +2,13 @@
 
 ## [Major Versions Log](#major-versions-log)
 
+## 1.2.0 - 27/01/2026
+
+- Added optional admin-only authentication with bootstrap user creation
+- Added admin UI for managing admin users
+- Seed default home/lists/admin shortcuts when the database is empty
+
+
 ## 1.1.12 - 26/01/2026
 
 - Render admin form errors inline instead of a generic error page
@@ -184,6 +191,7 @@
 
 # Major Versions Log
 
+- 1.2 - Lock admin actions behind authentication
 - 1.1 - Publication & QoL updates
 - **1.0** - Reworked documentation
 

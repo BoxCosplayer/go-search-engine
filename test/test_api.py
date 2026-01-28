@@ -1,10 +1,19 @@
 from backend.app import api
 
 
-def test_links_endpoint_lists_existing(client):
+def test_links_endpoint_lists_existing(client, test_config):
     rv = client.get("/api/links")
     assert rv.status_code == 200
-    assert rv.get_json() == {"links": []}
+    data = rv.get_json()
+    keywords = [item["keyword"] for item in data["links"]]
+    assert keywords == ["admin", "home", "lists"]
+    base_url = f"http://{test_config.host}:{test_config.port}"
+    url_map = {item["keyword"]: item["url"] for item in data["links"]}
+    assert url_map == {
+        "admin": f"{base_url}/admin",
+        "home": base_url,
+        "lists": f"{base_url}/lists",
+    }
 
 
 def test_links_post_and_get(client, db_conn):
@@ -20,8 +29,8 @@ def test_links_post_and_get(client, db_conn):
 
     rv = client.get("/api/links")
     data = rv.get_json()
-    assert data["links"][0]["keyword"] == "gh"
-    assert data["links"][0]["search_enabled"] is True
+    link_map = {item["keyword"]: item for item in data["links"]}
+    assert link_map["gh"]["search_enabled"] is True
 
 
 def test_links_post_defaults_search_disabled(client):

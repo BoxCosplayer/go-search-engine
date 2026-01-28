@@ -1,8 +1,16 @@
+import base64
 import json
 
 from backend.app.admin import config_routes
 from backend.app.admin import home as admin_home
+from backend.app.db import ensure_admin_users_schema
 from werkzeug.exceptions import BadRequest
+from werkzeug.security import generate_password_hash
+
+
+def _basic_auth(username: str, password: str) -> dict[str, str]:
+    token = base64.b64encode(f"{username}:{password}".encode()).decode("utf-8")
+    return {"Authorization": f"Basic {token}"}
 
 
 def test_admin_home_lists_links(client, db_conn):
@@ -31,9 +39,16 @@ def test_admin_error_handler_renders_message(app_ctx):
     assert "boom" in body
 
 
-def test_admin_config_get_and_post(client):
+def test_admin_config_get_and_post(client, db_conn):
     rv = client.get("/admin/config")
     assert rv.status_code == 200
+
+    ensure_admin_users_schema(db_conn)
+    db_conn.execute(
+        "INSERT INTO admin_users(username, password_hash, is_active) VALUES (?, ?, ?)",
+        ("admin", generate_password_hash("secret"), 1),
+    )
+    db_conn.commit()
 
     cfg_path = config_routes._discover_config_path()
     data = {
@@ -41,6 +56,7 @@ def test_admin_config_get_and_post(client):
         "port": "6000",
         "debug": "on",
         "allow_files": "on",
+        "admin_auth_enabled": "on",
         "fallback_url": "https://duck.example/?q={q}",
         "file_allow": "/data\n/tmp",
     }
@@ -52,7 +68,27 @@ def test_admin_config_get_and_post(client):
     assert blob["debug"] is True
     assert blob["port"] == 6000
     assert blob["file-allow"] == ["/data", "/tmp"]
+    assert blob["admin-auth-enabled"] is True
     assert "db-path" not in blob
+
+
+def test_admin_config_rejects_auth_without_users(client):
+    cfg_path = config_routes._discover_config_path()
+    data = {
+        "host": "127.0.0.1",
+        "port": "6000",
+        "debug": "on",
+        "allow_files": "on",
+        "admin_auth_enabled": "on",
+        "fallback_url": "https://duck.example/?q={q}",
+        "file_allow": "/data\n/tmp",
+    }
+    rv = client.post("/admin/config", data=data, follow_redirects=True)
+    assert rv.status_code == 200
+    assert b"Create at least one admin user before enabling authentication" in rv.data
+
+    blob = json.loads(cfg_path.read_text(encoding="utf-8"))
+    assert blob.get("admin-auth-enabled") is not True
 
 
 def test_admin_module_reexports(monkeypatch, tmp_path):
@@ -98,7 +134,7 @@ def test_admin_link_add_edit_delete(client, db_conn):
 
     rv = client.post("/admin/delete", data={"keyword": "git"})
     assert rv.status_code == 302
-    assert db_conn.execute("SELECT count(*) AS c FROM links").fetchone()["c"] == 0
+    assert db_conn.execute("SELECT count(*) AS c FROM links").fetchone()["c"] == 3
 
 
 def test_admin_add_sets_search_flag(client, db_conn):
@@ -239,3 +275,167 @@ def test_admin_list_delete_validation(client):
 
     rv = client.post("/admin/list-delete", data={"slug": "missing"})
     assert rv.status_code == 404
+
+
+def test_admin_auth_bootstrap_flow(client, db_conn, test_config):
+    test_config.admin_auth_enabled = True
+
+    rv = client.get("/admin/")
+    assert rv.status_code == 401
+    assert "Basic" in rv.headers.get("WWW-Authenticate", "")
+
+    bad_header = _basic_auth("bad name", "pass123")
+    rv = client.get("/admin/", headers=bad_header)
+    assert rv.status_code == 401
+    assert db_conn.execute("SELECT COUNT(*) AS c FROM admin_users").fetchone()["c"] == 0
+
+    empty_header = _basic_auth("admin", "")
+    rv = client.get("/admin/", headers=empty_header)
+    assert rv.status_code == 401
+    assert db_conn.execute("SELECT COUNT(*) AS c FROM admin_users").fetchone()["c"] == 0
+
+    header = _basic_auth("admin", "pass123")
+    rv = client.get("/admin/", headers=header)
+    assert rv.status_code == 200
+    row = db_conn.execute("SELECT username FROM admin_users").fetchone()
+    assert row["username"] == "admin"
+
+
+def test_admin_auth_rejects_invalid_and_inactive(client, db_conn, test_config):
+    test_config.admin_auth_enabled = True
+    ensure_admin_users_schema(db_conn)
+    db_conn.execute(
+        "INSERT INTO admin_users(username, password_hash, is_active) VALUES (?, ?, ?)",
+        ("admin", generate_password_hash("secret"), 1),
+    )
+    db_conn.commit()
+
+    rv = client.get("/admin/")
+    assert rv.status_code == 401
+
+    rv = client.get("/admin/", headers=_basic_auth("admin", "wrong"))
+    assert rv.status_code == 401
+
+    db_conn.execute("UPDATE admin_users SET is_active=0 WHERE username='admin'")
+    db_conn.commit()
+    rv = client.get("/admin/", headers=_basic_auth("admin", "secret"))
+    assert rv.status_code == 401
+
+    db_conn.execute("UPDATE admin_users SET is_active=1 WHERE username='admin'")
+    db_conn.commit()
+    rv = client.get("/admin/", headers=_basic_auth("admin", "secret"))
+    assert rv.status_code == 200
+
+
+def test_admin_users_management_routes(client, db_conn, test_config):
+    test_config.admin_auth_enabled = True
+    ensure_admin_users_schema(db_conn)
+    db_conn.execute(
+        "INSERT INTO admin_users(username, password_hash, is_active) VALUES (?, ?, ?)",
+        ("admin", generate_password_hash("secret"), 1),
+    )
+    db_conn.commit()
+    headers = _basic_auth("admin", "secret")
+
+    rv = client.get("/admin/users", headers=headers)
+    assert rv.status_code == 200
+
+    rv = client.post(
+        "/admin/users/add",
+        data={"username": "", "password": ""},
+        headers=headers,
+    )
+    assert rv.status_code == 302
+    assert "error=" in rv.headers["Location"]
+
+    rv = client.post(
+        "/admin/users/add",
+        data={"username": "second", "password": "pass123"},
+        headers=headers,
+    )
+    assert rv.status_code == 302
+
+    rv = client.post(
+        "/admin/users/add",
+        data={"username": "second", "password": "pass123"},
+        headers=headers,
+    )
+    assert rv.status_code == 302
+    assert "error=" in rv.headers["Location"]
+
+    rv = client.post(
+        "/admin/users/password",
+        data={"username": "second", "password": "newpass"},
+        headers=headers,
+    )
+    assert rv.status_code == 302
+
+    rv = client.post(
+        "/admin/users/password",
+        data={"username": "admin", "password": ""},
+        headers=headers,
+    )
+    assert rv.status_code == 302
+    assert "error=" in rv.headers["Location"]
+
+    rv = client.post(
+        "/admin/users/password",
+        data={"username": "missing", "password": "newpass"},
+        headers=headers,
+    )
+    assert rv.status_code == 302
+    assert "error=" in rv.headers["Location"]
+
+    rv = client.post(
+        "/admin/users/toggle",
+        data={"username": "second", "is_active": "0"},
+        headers=headers,
+    )
+    assert rv.status_code == 302
+
+    rv = client.post(
+        "/admin/users/toggle",
+        data={"username": "bad name", "is_active": "0"},
+        headers=headers,
+    )
+    assert rv.status_code == 302
+    assert "error=" in rv.headers["Location"]
+
+    rv = client.post(
+        "/admin/users/toggle",
+        data={"username": "missing", "is_active": "0"},
+        headers=headers,
+    )
+    assert rv.status_code == 302
+    assert "error=" in rv.headers["Location"]
+
+    rv = client.post(
+        "/admin/users/toggle",
+        data={"username": "admin", "is_active": "0"},
+        headers=headers,
+    )
+    assert rv.status_code == 302
+    assert "error=" in rv.headers["Location"]
+
+    rv = client.post(
+        "/admin/users/delete",
+        data={"username": "missing"},
+        headers=headers,
+    )
+    assert rv.status_code == 302
+    assert "error=" in rv.headers["Location"]
+
+    rv = client.post(
+        "/admin/users/delete",
+        data={"username": ""},
+        headers=headers,
+    )
+    assert rv.status_code == 302
+    assert "error=" in rv.headers["Location"]
+
+    rv = client.post(
+        "/admin/users/delete",
+        data={"username": "second"},
+        headers=headers,
+    )
+    assert rv.status_code == 302

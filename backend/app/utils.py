@@ -94,6 +94,7 @@ _DEFAULT_CONFIG = {
     "allow-files": True,
     "fallback-url": "",
     "file-allow": [],
+    "admin-auth-enabled": False,
 }
 _TRAILING_PUNCT_CHARS = string.whitespace + "'\"`#@)]},.!?:;"
 
@@ -189,6 +190,7 @@ class GoConfig(BaseModel):
     allow_files: bool = Field(False, alias="allow-files")
     fallback_url: str = Field("", alias="fallback-url")
     file_allow: list[str] = Field(default_factory=list, alias="file-allow")
+    admin_auth_enabled: bool = Field(False, alias="admin-auth-enabled")
 
     # Pydantic v2 config if available; fallback to v1
     if ConfigDict:

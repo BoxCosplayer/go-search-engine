@@ -4,5 +4,6 @@
     "debug": false,
     "allow-files": false,
     "fallback-url": "https://duckduckgo.com/?q={q}",
-    "file-allow": []
+    "file-allow": [],
+    "admin-auth-enabled": false
 }

@@ -8,7 +8,7 @@ import sqlite3
 import sys
 import threading
 import webbrowser
-from functools import lru_cache
+from functools import lru_cache, wraps
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import quote_plus, urljoin, urlparse
@@ -29,6 +29,7 @@ except Exception:  # pragma: no cover
 from flask import Flask, abort, redirect, render_template, request, url_for
 
 from .admin import admin_bp
+from .admin.auth import require_admin_auth
 from .api import (
     _search_suggestions,
     _select_links_with_lists,
@@ -337,12 +338,25 @@ else:
 
 app = Flask(__name__, template_folder=_TEMPLATES_DIR)
 db_init_app(app)
+
+
+def _admin_only(view_func):
+    @wraps(view_func)
+    def _wrapped(*args, **kwargs):
+        auth_result = require_admin_auth()
+        if auth_result is not None:
+            return auth_result
+        return view_func(*args, **kwargs)
+
+    return _wrapped
+
+
 app.register_blueprint(api_bp, url_prefix="/api")
 app.register_blueprint(admin_bp, url_prefix="/admin")
 app.register_blueprint(lists_bp, url_prefix="/lists")
 app.add_url_rule("/healthz", view_func=healthz)
-app.add_url_rule("/export/shortcuts.csv", view_func=export_shortcuts_csv)
-app.add_url_rule("/import/shortcuts", view_func=import_shortcuts_csv, methods=["POST"])
+app.add_url_rule("/export/shortcuts.csv", view_func=_admin_only(export_shortcuts_csv))
+app.add_url_rule("/import/shortcuts", view_func=_admin_only(import_shortcuts_csv), methods=["POST"])
 app.add_url_rule("/opensearch.xml", view_func=opensearch_description)
 app.add_url_rule("/opensearch/suggest", view_func=opensearch_suggest)
 

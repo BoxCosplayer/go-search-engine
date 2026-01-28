@@ -61,8 +61,22 @@ def _fallback_ensure_search_flag_column(conn):
         conn.commit()
 
 
+def _fallback_ensure_admin_users_schema(conn):
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS admin_users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    """)
+    conn.commit()
+
+
 ensure_lists_schema = _fallback_ensure_lists_schema
 ensure_search_flag_column = _fallback_ensure_search_flag_column
+ensure_admin_users_schema = _fallback_ensure_admin_users_schema
 
 
 try:
@@ -73,6 +87,7 @@ else:
     DB_PATH = _db.DB_PATH
     ensure_lists_schema = _db.ensure_lists_schema
     ensure_search_flag_column = _db.ensure_search_flag_column
+    ensure_admin_users_schema = _db.ensure_admin_users_schema
 
 
 def ensure_schema(conn):
@@ -139,6 +154,7 @@ def main():
         # Also ensure lists schema so admin/lists UIs work out-of-the-box
         ensure_lists_schema(conn)
         ensure_search_flag_column(conn)
+        ensure_admin_users_schema(conn)
 
         if len(sys.argv) >= 2:
             csv_path = sys.argv[1]
