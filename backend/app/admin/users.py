@@ -1,7 +1,7 @@
 from flask import redirect, render_template, request, url_for
 from werkzeug.security import generate_password_hash
 
-from ..db import ensure_admin_users_schema, get_db
+from ..db import get_db
 from . import admin_bp
 from .auth import (
     admin_user_count,
@@ -15,7 +15,6 @@ from .auth import (
 
 def _render_users(message: str = "", error: str = ""):
     db = get_db()
-    ensure_admin_users_schema(db)
     users = db.execute(
         """
         SELECT id, username, is_active, created_at
@@ -44,7 +43,6 @@ def admin_users():
 def admin_users_add():
     """Add a new admin user."""
     db = get_db()
-    ensure_admin_users_schema(db)
     username = normalize_username(request.form.get("username") or "")
     password = request.form.get("password") or ""
 
@@ -63,7 +61,6 @@ def admin_users_add():
 def admin_users_password():
     """Update an admin user's password."""
     db = get_db()
-    ensure_admin_users_schema(db)
     username = normalize_username(request.form.get("username") or "")
     password = request.form.get("password") or ""
 
@@ -88,7 +85,6 @@ def admin_users_password():
 def admin_users_toggle():
     """Enable or disable an admin user."""
     db = get_db()
-    ensure_admin_users_schema(db)
     username = normalize_username(request.form.get("username") or "")
     is_active_raw = (request.form.get("is_active") or "").strip()
     is_active = is_active_raw == "1"
@@ -117,7 +113,6 @@ def admin_users_toggle():
 def admin_users_delete():
     """Delete an admin user."""
     db = get_db()
-    ensure_admin_users_schema(db)
     username = normalize_username(request.form.get("username") or "")
     error = validate_username(username)
     if error:

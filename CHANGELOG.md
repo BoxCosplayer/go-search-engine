@@ -2,6 +2,12 @@
 
 ## [Major Versions Log](#major-versions-log)
 
+## 1.3.0 - 28/01/2026
+
+- Initialize schema/indexes at app startup to avoid per-request DDL.
+- Added SQLite performance pragmas (WAL, cache, busy timeout, temp store).
+- Added case-insensitive indexes and lookups for links/lists/admin users.
+
 ## 1.2.3 - 28/01/2026
 
 - Updated test coverage to 90%, in order to increase efficacy of the tests.
@@ -203,6 +209,7 @@
 
 # Major Versions Log
 
+- 1.3 - Speed Improvements
 - 1.2 - Security Improvements
 - 1.1 - Publication & QoL updates
 - **1.0** - Reworked documentation

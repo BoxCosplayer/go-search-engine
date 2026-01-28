@@ -4,7 +4,7 @@ from flask import Response, redirect, request, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from .. import utils
-from ..db import ensure_admin_users_schema, get_db
+from ..db import get_db
 
 ADMIN_AUTH_REALM = "go-admin"
 
@@ -51,7 +51,7 @@ def admin_user_count(db, active_only: bool = False) -> int:
 
 def fetch_admin_user(db, username: str):
     return db.execute(
-        "SELECT id, username, password_hash, is_active FROM admin_users WHERE lower(username)=lower(?)",
+        "SELECT id, username, password_hash, is_active FROM admin_users WHERE username COLLATE NOCASE = ?",
         (normalize_username(username),),
     ).fetchone()
 
@@ -77,7 +77,6 @@ def require_admin_auth():
         return None
 
     db = get_db()
-    ensure_admin_users_schema(db)
     user_count = admin_user_count(db)
 
     auth = request.authorization

@@ -22,11 +22,12 @@
 ~~add sast integration~~
 ~~authentication for adminUI / APIs~~
 ~~logging~~
-rework adminUI; split off adding links to somewhere w/o authentication
-API ratelimiting
+~~speed improvements~~
+official enterprise support -- what does this actually mean?
 db security
-speed improvements
-official enterprise support
+
+API ratelimiting? -- do I actually want this? especially as api access is mostly for admins, and i want to support batch seeidng with scripting
+rework adminUI; split off adding links to somewhere w/o authentication -- dont want this as making global changes should be exclusively admin-scoped features.
 
 ## 3.0 features:
 

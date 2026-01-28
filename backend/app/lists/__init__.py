@@ -1,6 +1,6 @@
 from flask import Blueprint, abort, render_template
 
-from ..db import ensure_lists_schema, get_db
+from ..db import get_db
 
 lists_bp = Blueprint("lists", __name__)
 
@@ -16,7 +16,6 @@ def index():
         A rendered HTML page (lists/index.html) with a "lists" collection.
     """
     db = get_db()
-    ensure_lists_schema(db)
     rows = db.execute(
         """
         SELECT li.slug, li.name, li.description, COUNT(ll.link_id) AS count
@@ -45,9 +44,8 @@ def view(slug):
         A rendered HTML page (lists/view.html) with "list" metadata and its "rows".
     """
     db = get_db()
-    ensure_lists_schema(db)
     info = db.execute(
-        "SELECT id, slug, name, description FROM lists WHERE lower(slug)=lower(?)",
+        "SELECT id, slug, name, description FROM lists WHERE slug COLLATE NOCASE = ?",
         (slug,),
     ).fetchone()
     if not info:
