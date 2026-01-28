@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from flask import Response, request
+from flask import Response, redirect, request, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from .. import utils
@@ -12,6 +12,14 @@ ADMIN_AUTH_REALM = "go-admin"
 def _unauthorized(message: str) -> Response:
     headers = {"WWW-Authenticate": f'Basic realm="{ADMIN_AUTH_REALM}"'}
     return Response(message, 401, headers)
+
+
+def _auth_failed_redirect():
+    return redirect(url_for("index"))
+
+
+def _wants_html_prompt() -> bool:
+    return request.path.startswith("/admin") and request.method in {"GET", "HEAD"}
 
 
 def normalize_username(username: str) -> str:
@@ -75,8 +83,12 @@ def require_admin_auth():
     auth = request.authorization
     if not auth or not auth.username or auth.password is None:
         if user_count == 0:
-            return _unauthorized("No admin users exist. Provide credentials to bootstrap.")
-        return _unauthorized("Unauthorized.")
+            if request.path.startswith("/admin"):
+                return _unauthorized("No admin users exist. Provide credentials to bootstrap.")
+            return _auth_failed_redirect()
+        if _wants_html_prompt():
+            return _unauthorized("Unauthorized.")
+        return _auth_failed_redirect()
 
     username = auth.username
     password = auth.password
@@ -89,6 +101,8 @@ def require_admin_auth():
         return None
 
     if not verify_admin_credentials(db, username, password):
-        return _unauthorized("Unauthorized.")
+        if _wants_html_prompt():
+            return _unauthorized("Unauthorized.")
+        return _auth_failed_redirect()
 
     return None
