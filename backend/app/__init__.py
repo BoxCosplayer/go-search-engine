@@ -7,6 +7,6 @@ Importing `backend.app` gives you the `app` object from
 """
 
 __all__ = ["app", "__version__"]
-__version__ = "1.2.2"
+__version__ = "1.2.3"
 
 from .main import app  # noqa: F401

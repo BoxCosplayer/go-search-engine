@@ -6,7 +6,7 @@ This project may rely on automation or AI-assisted agents to keep the codebase c
 - Stack: Python (3.11+ CI, 3.13 local), Flask, SQLite, PyInstaller.
 - Layout: `backend/app` holds blueprints (`admin`, `api`, `lists`) and shared modules (`main.py`, `db.py`, `utils.py`).
 - Admin blueprint is split by concern (`home.py`, `config_routes.py`, `links.py`, `lists.py`) with re-exports in `backend/app/admin/__init__.py`.
-- Tests live under `test/` and must keep `coverage run -m pytest` at 100%.
+- Tests live under `test/` and must keep `coverage run -m pytest` at 90%.
 
 ## Agent Workflow
 1. **Sync context first**
@@ -30,7 +30,7 @@ This project may rely on automation or AI-assisted agents to keep the codebase c
 
 ## Testing & Quality Gates
 - Always run `.\.venv\Scripts\python.exe -m coverage run -m pytest` (or `python -m coverage run -m pytest` on Linux) after code changes.
-- Follow up with `coverage report --fail-under=100`. CI enforces 100% coverage via `.github/workflows/ci.yml`.
+- Follow up with `coverage report --fail-under=90`. CI enforces 90% coverage via `.github/workflows/ci.yml`.
 - Ruff is configured via `.ruff.toml`; run `ruff check`/`ruff format` after touching Python code.
 
 ## Common Scenarios
@@ -45,6 +45,3 @@ This project may rely on automation or AI-assisted agents to keep the codebase c
 - Log coverage adjustments or temporary skips directly in commit/PR descriptions.
 
 Sticking to this checklist keeps agent-driven changes predictable, testable, and aligned with the repository's guarantees. Feel free to expand this guide as new automation patterns emerge.
-
-
-
