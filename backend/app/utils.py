@@ -73,6 +73,11 @@ def _default_config_path() -> Path:
     return _user_data_dir() / "config.json"
 
 
+def _default_log_path() -> Path:
+    """Return the OS-specific default location for the log file."""
+    return _user_data_dir() / "go-search-engine.log"
+
+
 def get_db_path() -> Path:
     """Return the runtime database path, honoring GO_DB_PATH overrides."""
     override = os.environ.get("GO_DB_PATH")
@@ -87,6 +92,40 @@ def get_db_path() -> Path:
     return _default_db_path()
 
 
+def get_log_path() -> Path:
+    """Return the runtime log file path, honoring GO_LOG_PATH overrides."""
+    override = os.environ.get("GO_LOG_PATH")
+    if override:
+        candidate = Path(override).expanduser()
+        if not candidate.is_absolute():
+            candidate = runtime_base_dir() / candidate
+        try:
+            return candidate.resolve()
+        except OSError:  # pragma: no cover - resolve can fail if drive missing
+            return candidate
+
+    cfg_value = (getattr(config, "log_file", "") or "").strip()  # type: ignore[name-defined]
+    if cfg_value:
+        candidate = Path(cfg_value).expanduser()
+        if not candidate.is_absolute():
+            candidate = runtime_base_dir() / candidate
+        try:
+            return candidate.resolve()
+        except OSError:  # pragma: no cover - resolve can fail if drive missing
+            return candidate
+
+    return _default_log_path()
+
+
+def get_log_level() -> str:
+    """Return the configured log level, honoring GO_LOG_LEVEL overrides."""
+    override = os.environ.get("GO_LOG_LEVEL")
+    if override:
+        return override.strip()
+    value = (getattr(config, "log_level", "") or "").strip()  # type: ignore[name-defined]
+    return value or "INFO"
+
+
 _DEFAULT_CONFIG = {
     "host": "127.0.0.1",
     "port": 5000,
@@ -95,6 +134,8 @@ _DEFAULT_CONFIG = {
     "fallback-url": "",
     "file-allow": [],
     "admin-auth-enabled": False,
+    "log-level": "INFO",
+    "log-file": "",
 }
 _TRAILING_PUNCT_CHARS = string.whitespace + "'\"`#@)]},.!?:;"
 
@@ -191,6 +232,8 @@ class GoConfig(BaseModel):
     fallback_url: str = Field("", alias="fallback-url")
     file_allow: list[str] = Field(default_factory=list, alias="file-allow")
     admin_auth_enabled: bool = Field(False, alias="admin-auth-enabled")
+    log_level: str = Field("INFO", alias="log-level")
+    log_file: str = Field("", alias="log-file")
 
     # Pydantic v2 config if available; fallback to v1
     if ConfigDict:

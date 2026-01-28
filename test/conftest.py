@@ -16,6 +16,8 @@ def prepare_test_config(monkeypatch, tmp_path):
         "allow-files": True,
         "fallback-url": "https://search.example/?q={q}",
         "file-allow": [str(tmp_path)],
+        "log-level": "DEBUG",
+        "log-file": str(tmp_path / "go-search-engine.log"),
     }
     cfg_file.write_text(json.dumps(cfg_data, indent=2), encoding="utf-8")
 

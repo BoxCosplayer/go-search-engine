@@ -31,7 +31,10 @@ ensure_config_file() {
   "debug": false,
   "allow-files": false,
   "fallback-url": "",
-  "file-allow": []
+  "file-allow": [],
+  "admin-auth-enabled": false,
+  "log-level": "INFO",
+  "log-file": "/data/go-search-engine.log"
 }
 JSON
 }
@@ -58,6 +61,18 @@ except (TypeError, ValueError):
 file_allow = data.get("file-allow")
 if not isinstance(file_allow, list):
     data["file-allow"] = []
+
+log_file_env = os.environ.get("GO_LOG_PATH")
+if log_file_env:
+    data["log-file"] = log_file_env
+elif not data.get("log-file"):
+    data["log-file"] = "/data/go-search-engine.log"
+
+log_level_env = os.environ.get("GO_LOG_LEVEL")
+if log_level_env:
+    data["log-level"] = log_level_env
+elif not data.get("log-level"):
+    data["log-level"] = "INFO"
 
 data.pop("db-path", None)
 data.pop("db_path", None)

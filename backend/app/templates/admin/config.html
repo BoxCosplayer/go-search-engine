@@ -101,6 +101,7 @@
 
     input[type="text"],
     input[type="number"],
+    select,
     textarea {
       width: 100%;
       margin-top: .35rem;
@@ -119,6 +120,7 @@
     }
 
     input:focus,
+    select:focus,
     textarea:focus {
       border-color: var(--accent);
       box-shadow: 0 0 0 3px rgba(88, 166, 255, .25);
@@ -256,6 +258,28 @@
           <strong>Database location</strong><br>
           Stored at <code>{{ db_path }}</code>. Set the <code>GO_DB_PATH</code> environment variable before starting the server if you need to move it.
         </div>
+
+        <div class="flash notice">
+          <strong>Log file location</strong><br>
+          Stored at <code>{{ log_path }}</code>. Set <code>GO_LOG_PATH</code> before starting the server or override the path below.
+        </div>
+
+        <label for="log_level">Log level
+          <select id="log_level" name="log_level">
+            <option value="DEBUG" {% if form.log_level|upper == "DEBUG" %}selected{% endif %}>DEBUG</option>
+            <option value="INFO" {% if form.log_level|upper == "INFO" %}selected{% endif %}>INFO</option>
+            <option value="WARNING" {% if form.log_level|upper == "WARNING" %}selected{% endif %}>WARNING</option>
+            <option value="ERROR" {% if form.log_level|upper == "ERROR" %}selected{% endif %}>ERROR</option>
+            <option value="CRITICAL" {% if form.log_level|upper == "CRITICAL" %}selected{% endif %}>CRITICAL</option>
+          </select>
+          <span>Controls verbosity for request logging, API usage, and file access.</span>
+        </label>
+
+        <label for="log_file">Log file path
+          <input id="log_file" name="log_file" type="text" value="{{ form.log_file }}"
+            placeholder="Leave blank to use the default log location">
+          <span>Optional override for the log file path. Leave blank to keep the default.</span>
+        </label>
 
         <label for="fallback_url">Fallback search URL
           <input id="fallback_url" name="fallback_url" type="text" value="{{ form.fallback_url }}"

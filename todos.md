@@ -21,13 +21,13 @@
 ~~publish docker image to ghcr / release job~~
 ~~add sast integration~~
 ~~authentication for adminUI / APIs~~
+~~logging~~
 rework adminUI; split off adding links to somewhere w/o authentication
 API ratelimiting
 db security
 speed improvements
+official enterprise support
 
 ## 3.0 features:
 
-rewrite in lower-level language (c/c++/rust etc.)
 official linux / macos support
-official enterprise support
