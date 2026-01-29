@@ -2,6 +2,12 @@
 
 ## [Major Versions Log](#major-versions-log)
 
+
+## 1.3.1 - 29/01/2026
+
+- Improved short-query matching by applying tokenized title/keyword checks.
+- Added FTS5 trigram index for fast substring suggestions across keyword/title.
+
 ## 1.3.0 - 28/01/2026
 
 - Initialize schema/indexes at app startup to avoid per-request DDL.
