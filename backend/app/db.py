@@ -1,3 +1,4 @@
+import logging
 import os
 import sqlite3
 import sys
@@ -6,6 +7,8 @@ from pathlib import Path
 from flask import g
 
 from .utils import config, get_db_path
+
+logger = logging.getLogger(__name__)
 
 
 def _base_dir() -> str:
@@ -132,6 +135,7 @@ def init_db():
     ensure_lists_schema(db)
     ensure_admin_users_schema(db)
     ensure_indexes(db)
+    ensure_search_fts(db)
     ensure_seed_links(db)
 
 
@@ -205,6 +209,77 @@ def ensure_indexes(db):
         "CREATE INDEX IF NOT EXISTS idx_admin_users_username_nocase ON admin_users(username COLLATE NOCASE)"
     )
     db.commit()
+
+
+def _has_trigger(db: sqlite3.Connection, name: str) -> bool:
+    return (
+        db.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='trigger' AND name=? LIMIT 1",
+            (name,),
+        ).fetchone()
+        is not None
+    )
+
+
+def ensure_search_fts(db: sqlite3.Connection) -> bool:
+    """Ensure the FTS5 trigram index for substring suggestions exists."""
+    existing = db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='links_fts' LIMIT 1").fetchone()
+    created = False
+    if not existing:
+        try:
+            db.execute(
+                """
+                CREATE VIRTUAL TABLE links_fts USING fts5(
+                  keyword,
+                  title,
+                  content='links',
+                  content_rowid='id',
+                  tokenize='trigram'
+                );
+                """
+            )
+            created = True
+        except sqlite3.OperationalError as exc:
+            logger.warning("FTS5 trigram unavailable; substring search will fall back. err=%s", exc)
+            return False
+
+    triggers_missing = created or not all(
+        _has_trigger(db, name) for name in ("links_fts_ai", "links_fts_ad", "links_fts_au")
+    )
+
+    try:
+        db.execute(
+            """
+            CREATE TRIGGER IF NOT EXISTS links_fts_ai AFTER INSERT ON links BEGIN
+              INSERT INTO links_fts(rowid, keyword, title) VALUES (new.id, new.keyword, new.title);
+            END;
+            """
+        )
+        db.execute(
+            """
+            CREATE TRIGGER IF NOT EXISTS links_fts_ad AFTER DELETE ON links BEGIN
+              INSERT INTO links_fts(links_fts, rowid, keyword, title)
+              VALUES('delete', old.id, old.keyword, old.title);
+            END;
+            """
+        )
+        db.execute(
+            """
+            CREATE TRIGGER IF NOT EXISTS links_fts_au AFTER UPDATE ON links BEGIN
+              INSERT INTO links_fts(links_fts, rowid, keyword, title)
+              VALUES('delete', old.id, old.keyword, old.title);
+              INSERT INTO links_fts(rowid, keyword, title) VALUES (new.id, new.keyword, new.title);
+            END;
+            """
+        )
+
+        if triggers_missing:
+            db.execute("INSERT INTO links_fts(links_fts) VALUES('rebuild')")
+        db.commit()
+        return True
+    except sqlite3.OperationalError as exc:
+        logger.warning("Failed to configure FTS5 triggers; substring search will fall back. err=%s", exc)
+        return False
 
 
 def init_app(app):

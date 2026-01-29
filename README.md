@@ -93,18 +93,7 @@ Python 3.11+ is required (CI runs 3.11; local development uses 3.13).
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-
-# seed config.json on first run
-mkdir -p ~/.local/share/go-search-engine
-cp config-template.txt ~/.local/share/go-search-engine/config.json
-# macOS: mkdir -p "$HOME/Library/Application Support/go-search-engine" && \
-#        cp config-template.txt "$HOME/Library/Application Support/go-search-engine/config.json"
-# Windows (PowerShell):
-#   New-Item -ItemType Directory -Force -Path "$env:APPDATA\go-search-engine"
-#   Copy-Item config-template.txt "$env:APPDATA\go-search-engine\config.json"
-
-python init_db.py
-python app.py
+python -m backend
 ```
 
 The dev server uses `config.json` for host and port, and stores data/logs in the user data directory unless `GO_DB_PATH` or `GO_LOG_PATH` is set. Use `GO_CONFIG_PATH` to point at a different config file.

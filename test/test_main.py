@@ -425,6 +425,30 @@ def test_opensearch_suggest_returns_matches(client, db_conn):
     assert data[3][0] == "https://github.com"
 
 
+def test_opensearch_suggest_matches_keyword_substring(client, db_conn):
+    add_link(db_conn, "github", "https://github.com", "GitHub")
+    rv = client.get("/opensearch/suggest", query_string={"q": "hub"})
+    assert rv.status_code == 200
+    data = json.loads(rv.data)
+    assert "github" in data[1]
+
+
+def test_opensearch_suggest_matches_title_substring(client, db_conn):
+    add_link(db_conn, "hs", "https://hubspot.com", "HubSpot")
+    rv = client.get("/opensearch/suggest", query_string={"q": "spot"})
+    assert rv.status_code == 200
+    data = json.loads(rv.data)
+    assert "hs" in data[1]
+
+
+def test_opensearch_suggest_matches_title_multi_token_short_query(client, db_conn):
+    add_link(db_conn, "go", "https://example.com", "Go Search")
+    rv = client.get("/opensearch/suggest", query_string={"q": "go se"})
+    assert rv.status_code == 200
+    data = json.loads(rv.data)
+    assert "go" in data[1]
+
+
 def test_opensearch_suggest_blank_query(client):
     rv = client.get("/opensearch/suggest")
     assert rv.status_code == 200

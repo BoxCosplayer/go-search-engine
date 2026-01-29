@@ -79,22 +79,99 @@ def _serialize_link(row):
     }
 
 
+def _quote_fts_term(term: str) -> str:
+    return '"' + term.replace('"', '""') + '"'
+
+
+def _build_fts_query(term: str) -> tuple[str, list[str], list[str]]:
+    tokens = [tok for tok in term.split() if tok]
+    long_tokens = [tok for tok in tokens if len(tok) >= 3]
+    short_tokens = [tok for tok in tokens if len(tok) < 3]
+    if not long_tokens:
+        return "", short_tokens, tokens
+    return " AND ".join(_quote_fts_term(tok) for tok in long_tokens), short_tokens, tokens
+
+
+def _like_suggestions(db, tokens: list[str]):
+    tokens = [tok for tok in tokens if tok][:3]
+    if not tokens:
+        return []
+    if len(tokens) == 1:
+        like = f"%{tokens[0]}%"
+        rows = db.execute(
+            """
+            SELECT keyword, title, url
+            FROM links
+            WHERE (keyword LIKE ? OR (title IS NOT NULL AND title LIKE ?))
+            ORDER BY keyword COLLATE NOCASE LIMIT 10
+            """,
+            (like, like),
+        ).fetchall()
+    elif len(tokens) == 2:
+        like1 = f"%{tokens[0]}%"
+        like2 = f"%{tokens[1]}%"
+        rows = db.execute(
+            """
+            SELECT keyword, title, url
+            FROM links
+            WHERE (keyword LIKE ? OR (title IS NOT NULL AND title LIKE ?))
+              AND (keyword LIKE ? OR (title IS NOT NULL AND title LIKE ?))
+            ORDER BY keyword COLLATE NOCASE LIMIT 10
+            """,
+            (like1, like1, like2, like2),
+        ).fetchall()
+    else:
+        like1 = f"%{tokens[0]}%"
+        like2 = f"%{tokens[1]}%"
+        like3 = f"%{tokens[2]}%"
+        rows = db.execute(
+            """
+            SELECT keyword, title, url
+            FROM links
+            WHERE (keyword LIKE ? OR (title IS NOT NULL AND title LIKE ?))
+              AND (keyword LIKE ? OR (title IS NOT NULL AND title LIKE ?))
+              AND (keyword LIKE ? OR (title IS NOT NULL AND title LIKE ?))
+            ORDER BY keyword COLLATE NOCASE LIMIT 10
+            """,
+            (like1, like1, like2, like2, like3, like3),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
 def _search_suggestions(db, term: str):
     """Return best-effort search suggestions for a query term."""
     term = (term or "").strip()
     if not term:
         return []
-    like = f"%{term}%"
-    rows = db.execute(
-        """
-        SELECT keyword, title, url
-        FROM links
-        WHERE keyword LIKE ? OR (title IS NOT NULL AND title LIKE ?) OR url LIKE ?
-        ORDER BY keyword COLLATE NOCASE LIMIT 10
-        """,
-        (like, like, like),
-    ).fetchall()
-    return [dict(row) for row in rows]
+    fts_query, short_tokens, tokens = _build_fts_query(term)
+    if fts_query:
+        try:
+            rows = db.execute(
+                """
+                SELECT l.keyword, l.title, l.url
+                FROM links_fts f
+                JOIN links l ON l.id = f.rowid
+                WHERE links_fts MATCH ?
+                ORDER BY bm25(links_fts), l.keyword COLLATE NOCASE
+                LIMIT 50
+                """,
+                (fts_query,),
+            ).fetchall()
+        except sqlite3.OperationalError:
+            return _like_suggestions(db, tokens)
+
+        if short_tokens:
+            lowered = [tok.lower() for tok in short_tokens]
+            filtered = []
+            for row in rows:
+                hay = f"{row['keyword']} {row['title'] or ''}".lower()
+                if all(tok in hay for tok in lowered):
+                    filtered.append(row)
+            rows = filtered
+
+        return [dict(row) for row in rows[:10]]
+
+    return _like_suggestions(db, tokens)
 
 
 def _select_links_with_lists(db):
