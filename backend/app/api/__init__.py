@@ -93,21 +93,48 @@ def _build_fts_query(term: str) -> tuple[str, list[str], list[str]]:
 
 
 def _like_suggestions(db, tokens: list[str]):
+    tokens = [tok for tok in tokens if tok][:3]
     if not tokens:
         return []
-    clauses = []
-    params: list[str] = []
-    for token in tokens:
-        like = f"%{token}%"
-        clauses.append("(keyword LIKE ? OR (title IS NOT NULL AND title LIKE ?))")
-        params.extend([like, like])
-    sql = f"""
-        SELECT keyword, title, url
-        FROM links
-        WHERE {" AND ".join(clauses)}
-        ORDER BY keyword COLLATE NOCASE LIMIT 10
-        """
-    rows = db.execute(sql, params).fetchall()
+    if len(tokens) == 1:
+        like = f"%{tokens[0]}%"
+        rows = db.execute(
+            """
+            SELECT keyword, title, url
+            FROM links
+            WHERE (keyword LIKE ? OR (title IS NOT NULL AND title LIKE ?))
+            ORDER BY keyword COLLATE NOCASE LIMIT 10
+            """,
+            (like, like),
+        ).fetchall()
+    elif len(tokens) == 2:
+        like1 = f"%{tokens[0]}%"
+        like2 = f"%{tokens[1]}%"
+        rows = db.execute(
+            """
+            SELECT keyword, title, url
+            FROM links
+            WHERE (keyword LIKE ? OR (title IS NOT NULL AND title LIKE ?))
+              AND (keyword LIKE ? OR (title IS NOT NULL AND title LIKE ?))
+            ORDER BY keyword COLLATE NOCASE LIMIT 10
+            """,
+            (like1, like1, like2, like2),
+        ).fetchall()
+    else:
+        like1 = f"%{tokens[0]}%"
+        like2 = f"%{tokens[1]}%"
+        like3 = f"%{tokens[2]}%"
+        rows = db.execute(
+            """
+            SELECT keyword, title, url
+            FROM links
+            WHERE (keyword LIKE ? OR (title IS NOT NULL AND title LIKE ?))
+              AND (keyword LIKE ? OR (title IS NOT NULL AND title LIKE ?))
+              AND (keyword LIKE ? OR (title IS NOT NULL AND title LIKE ?))
+            ORDER BY keyword COLLATE NOCASE LIMIT 10
+            """,
+            (like1, like1, like2, like2, like3, like3),
+        ).fetchall()
     return [dict(row) for row in rows]
 
 
