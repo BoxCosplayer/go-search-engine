@@ -74,9 +74,54 @@ def _fallback_ensure_admin_users_schema(conn):
     conn.commit()
 
 
+def _fallback_ensure_search_fts(conn):
+    try:
+        conn.execute(
+            """
+            CREATE VIRTUAL TABLE IF NOT EXISTS links_fts USING fts5(
+              keyword,
+              title,
+              content='links',
+              content_rowid='id',
+              tokenize='trigram'
+            );
+            """
+        )
+    except sqlite3.OperationalError:
+        return False
+    conn.execute(
+        """
+        CREATE TRIGGER IF NOT EXISTS links_fts_ai AFTER INSERT ON links BEGIN
+          INSERT INTO links_fts(rowid, keyword, title) VALUES (new.id, new.keyword, new.title);
+        END;
+        """
+    )
+    conn.execute(
+        """
+        CREATE TRIGGER IF NOT EXISTS links_fts_ad AFTER DELETE ON links BEGIN
+          INSERT INTO links_fts(links_fts, rowid, keyword, title)
+          VALUES('delete', old.id, old.keyword, old.title);
+        END;
+        """
+    )
+    conn.execute(
+        """
+        CREATE TRIGGER IF NOT EXISTS links_fts_au AFTER UPDATE ON links BEGIN
+          INSERT INTO links_fts(links_fts, rowid, keyword, title)
+          VALUES('delete', old.id, old.keyword, old.title);
+          INSERT INTO links_fts(rowid, keyword, title) VALUES (new.id, new.keyword, new.title);
+        END;
+        """
+    )
+    conn.execute("INSERT INTO links_fts(links_fts) VALUES('rebuild')")
+    conn.commit()
+    return True
+
+
 ensure_lists_schema = _fallback_ensure_lists_schema
 ensure_search_flag_column = _fallback_ensure_search_flag_column
 ensure_admin_users_schema = _fallback_ensure_admin_users_schema
+ensure_search_fts = _fallback_ensure_search_fts
 
 
 try:
@@ -88,6 +133,7 @@ else:
     ensure_lists_schema = _db.ensure_lists_schema
     ensure_search_flag_column = _db.ensure_search_flag_column
     ensure_admin_users_schema = _db.ensure_admin_users_schema
+    ensure_search_fts = _db.ensure_search_fts
 
 
 def ensure_schema(conn):
@@ -155,6 +201,7 @@ def main():
         ensure_lists_schema(conn)
         ensure_search_flag_column(conn)
         ensure_admin_users_schema(conn)
+        ensure_search_fts(conn)
 
         if len(sys.argv) >= 2:
             csv_path = sys.argv[1]
