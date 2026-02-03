@@ -88,7 +88,8 @@ def _fallback_ensure_search_fts(conn):
             """
         )
     except sqlite3.OperationalError:
-        return False
+        raise RuntimeError("""SQLite FTS5 with the trigram tokenizer is required 
+                           for search suggestions.""") from None
     conn.execute(
         """
         CREATE TRIGGER IF NOT EXISTS links_fts_ai AFTER INSERT ON links BEGIN

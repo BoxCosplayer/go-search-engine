@@ -2,6 +2,10 @@
 
 ## [Major Versions Log](#major-versions-log)
 
+## 1.3.2 - 03/02/2026
+
+- Enforced SQLite FTS5 trigram support at startup; app now fails fast when unavailable.
+- Added in-memory caching for search suggestions with invalidation on link changes.
 
 ## 1.3.1 - 29/01/2026
 

@@ -358,6 +358,7 @@ else:
     _TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), "templates")
 
 app = Flask(__name__, template_folder=_TEMPLATES_DIR)
+app.debug = DEBUG
 db_init_app(app)
 
 

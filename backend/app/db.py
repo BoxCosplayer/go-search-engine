@@ -1,4 +1,3 @@
-import logging
 import os
 import sqlite3
 import sys
@@ -7,8 +6,6 @@ from pathlib import Path
 from flask import g
 
 from .utils import config, get_db_path
-
-logger = logging.getLogger(__name__)
 
 
 def _base_dir() -> str:
@@ -240,8 +237,9 @@ def ensure_search_fts(db: sqlite3.Connection) -> bool:
             )
             created = True
         except sqlite3.OperationalError as exc:
-            logger.warning("FTS5 trigram unavailable; substring search will fall back. err=%s", exc)
-            return False
+            raise RuntimeError(
+                "SQLite FTS5 with the trigram tokenizer is required for search suggestions."
+            ) from exc
 
     triggers_missing = created or not all(
         _has_trigger(db, name) for name in ("links_fts_ai", "links_fts_ad", "links_fts_au")
@@ -278,8 +276,7 @@ def ensure_search_fts(db: sqlite3.Connection) -> bool:
         db.commit()
         return True
     except sqlite3.OperationalError as exc:
-        logger.warning("Failed to configure FTS5 triggers; substring search will fall back. err=%s", exc)
-        return False
+        raise RuntimeError("Failed to configure SQLite FTS5 triggers.") from exc
 
 
 def init_app(app):

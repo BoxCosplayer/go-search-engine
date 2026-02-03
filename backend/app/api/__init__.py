@@ -12,6 +12,7 @@ from flask import Blueprint, Response, abort, g, redirect, request, url_for
 from werkzeug.exceptions import BadRequest, HTTPException
 
 from ..db import get_db
+from ..search_cache import get_cached_suggestions, invalidate_suggestions_cache
 from ..utils import sanitize_query, to_slug
 
 api_bp = Blueprint("api", __name__)
@@ -138,14 +139,32 @@ def _like_suggestions(db, tokens: list[str]):
     return [dict(row) for row in rows]
 
 
+def _suggestions_cache_key(db, term: str) -> str:
+    term_key = (term or "").strip().lower()
+    if not term_key:
+        return ""
+    try:
+        row = db.execute("PRAGMA database_list").fetchone()
+        db_path = row[2] if row and len(row) > 2 else ""
+    except Exception:
+        db_path = ""
+    try:
+        row = db.execute("PRAGMA data_version").fetchone()
+        data_version = int(row[0]) if row else 0
+    except Exception:
+        data_version = 0
+    return f"{db_path}|{data_version}|{term_key}"
+
+
 def _search_suggestions(db, term: str):
-    """Return best-effort search suggestions for a query term."""
+    """Return search suggestions for a query term."""
     term = (term or "").strip()
     if not term:
         return []
-    fts_query, short_tokens, tokens = _build_fts_query(term)
-    if fts_query:
-        try:
+
+    def _load():
+        fts_query, short_tokens, tokens = _build_fts_query(term)
+        if fts_query:
             rows = db.execute(
                 """
                 SELECT l.keyword, l.title, l.url
@@ -157,21 +176,22 @@ def _search_suggestions(db, term: str):
                 """,
                 (fts_query,),
             ).fetchall()
-        except sqlite3.OperationalError:
-            return _like_suggestions(db, tokens)
 
-        if short_tokens:
-            lowered = [tok.lower() for tok in short_tokens]
-            filtered = []
-            for row in rows:
-                hay = f"{row['keyword']} {row['title'] or ''}".lower()
-                if all(tok in hay for tok in lowered):
-                    filtered.append(row)
-            rows = filtered
+            if short_tokens:
+                lowered = [tok.lower() for tok in short_tokens]
+                filtered = []
+                for row in rows:
+                    hay = f"{row['keyword']} {row['title'] or ''}".lower()
+                    if all(tok in hay for tok in lowered):
+                        filtered.append(row)
+                rows = filtered
 
-        return [dict(row) for row in rows[:10]]
+            return [dict(row) for row in rows[:10]]
 
-    return _like_suggestions(db, tokens)
+        return _like_suggestions(db, tokens)
+
+    cache_key = _suggestions_cache_key(db, term)
+    return get_cached_suggestions(cache_key, _load)
 
 
 def _select_links_with_lists(db):
@@ -322,6 +342,7 @@ def links():
                 (keyword, url, title, int(search_enabled)),
             )
             db.commit()
+            invalidate_suggestions_cache()
         except sqlite3.IntegrityError:
             return {"error": f"keyword '{escape(keyword)}' already exists"}, 400
         return {"ok": True}
@@ -378,6 +399,7 @@ def update_link(keyword: str):
             (new_keyword, new_url, new_title, int(new_search_enabled), row["id"]),
         )
         db.commit()
+        invalidate_suggestions_cache()
     except sqlite3.IntegrityError:
         abort(400, f"keyword '{new_keyword}' already exists")
 
@@ -404,6 +426,7 @@ def delete_link(keyword: str):
         abort(404, "link not found")
     db.execute("DELETE FROM links WHERE id=?", (row["id"],))
     db.commit()
+    invalidate_suggestions_cache()
     return {"ok": True}
 
 
@@ -451,6 +474,7 @@ def lists():
 
         db.execute("INSERT OR IGNORE INTO links(keyword, url, title) VALUES (?, ?, ?)", (slug, list_url, title))
         db.commit()
+        invalidate_suggestions_cache()
 
         return {"ok": True}
 
@@ -519,6 +543,7 @@ def list_detail(slug: str):
                 (new_slug, list_url, title, slug),
             )
             db.commit()
+        invalidate_suggestions_cache()
 
         return {
             "ok": True,
@@ -536,6 +561,7 @@ def list_detail(slug: str):
     with suppress(Exception):
         db.execute("DELETE FROM links WHERE keyword COLLATE NOCASE = ?", (slug,))
     db.commit()
+    invalidate_suggestions_cache()
     return {"ok": True}
 
 
@@ -657,6 +683,7 @@ def import_shortcuts_csv():
     db = get_db()
     _import_shortcuts_from_csv(db, uploaded)
     db.commit()
+    invalidate_suggestions_cache()
     return redirect(url_for("index"))
 
 
