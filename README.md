@@ -96,7 +96,7 @@ pip install -r requirements.txt
 python -m backend
 ```
 
-The dev server uses `config.json` for host and port, and stores data/logs in the user data directory unless `GO_DB_PATH` or `GO_LOG_PATH` is set. Use `GO_CONFIG_PATH` to point at a different config file.
+The local server runs under Waitress (no Flask dev reloader). It uses `config.json` for host and port, and stores data/logs in the user data directory unless `GO_DB_PATH` or `GO_LOG_PATH` is set. Use `GO_CONFIG_PATH` to point at a different config file.
 
 When `admin-auth-enabled` is true, `/admin` requires HTTP Basic Auth. If no admin users exist yet, the first successful Basic Auth attempt will create the initial user. Manage additional users at `http://127.0.0.1:5000/admin/users`.
 

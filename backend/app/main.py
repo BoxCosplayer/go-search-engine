@@ -645,8 +645,10 @@ if __name__ == "__main__":  # pragma: no cover
         ensure_search_flag_column(db)
 
     def _run_server():
-        """Run the Flask development server (no reloader)."""
-        app.run(host=HOST, port=PORT, debug=DEBUG, use_reloader=False)
+        """Run the Waitress WSGI server."""
+        from waitress import serve
+
+        serve(app, host=HOST, port=PORT)
 
     t = threading.Thread(target=_run_server, daemon=True)
     t.start()
