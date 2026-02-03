@@ -4,6 +4,7 @@ from contextlib import suppress
 from flask import redirect, request
 
 from ..db import get_db
+from ..search_cache import invalidate_suggestions_cache
 from ..utils import to_slug
 from . import admin_bp
 from .home import admin_error
@@ -34,6 +35,7 @@ def admin_list_add():
 
     db.execute("INSERT OR IGNORE INTO links(keyword, url, title) VALUES (?, ?, ?)", (slug, list_url, title))
     db.commit()
+    invalidate_suggestions_cache()
 
     return redirect("/admin")
 
@@ -87,6 +89,8 @@ def admin_set_lists():
         ).fetchone()["id"]
         db.execute("INSERT OR IGNORE INTO link_lists(link_id, list_id) VALUES (?, ?)", (link_id, list_id))
     db.commit()
+    if new_lists:
+        invalidate_suggestions_cache()
     return redirect("/admin")
 
 
@@ -106,4 +110,5 @@ def admin_list_delete():
     db.execute("DELETE FROM lists WHERE id=?", (row["id"],))
     db.execute("DELETE FROM links WHERE keyword COLLATE NOCASE = ?", (row["slug"],))
     db.commit()
+    invalidate_suggestions_cache()
     return redirect("/lists")

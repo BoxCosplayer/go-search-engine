@@ -3,6 +3,7 @@ import sqlite3
 from flask import redirect, request
 
 from ..db import get_db
+from ..search_cache import invalidate_suggestions_cache
 from . import admin_bp
 from .home import admin_error
 
@@ -27,6 +28,7 @@ def admin_add():
             (keyword, url, title, search_enabled),
         )
         db.commit()
+        invalidate_suggestions_cache()
     except Exception:
         return admin_error(f"Keyword '{keyword}' already exists", 400)
     return redirect("/admin")
@@ -41,6 +43,7 @@ def admin_delete():
     db = get_db()
     db.execute("DELETE FROM links WHERE keyword COLLATE NOCASE = ?", (keyword,))
     db.commit()
+    invalidate_suggestions_cache()
     return redirect("/admin")
 
 
@@ -72,6 +75,7 @@ def admin_update():
             (keyword, url, title, search_enabled, row["id"]),
         )
         db.commit()
+        invalidate_suggestions_cache()
     except sqlite3.IntegrityError:
         return admin_error(f"Keyword '{keyword}' already exists", 400)
 
