@@ -2,6 +2,8 @@
 
 from PyInstaller.building.datastruct import Tree
 
+hiddenimports = ['waitress']
+
 a = Analysis(
     ['app.py'],
     pathex=[],
