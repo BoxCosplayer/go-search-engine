@@ -536,10 +536,6 @@
         <label>URL
           <input name="url" required value="{{ edit_row['url'] }}">
         </label>
-        <label class="checkbox">
-          <input type="checkbox" name="search_enabled" {% if edit_row['search_enabled'] %}checked{% endif %}>
-          Enable !keyword search
-        </label>
         <button type="submit">Save changes</button>
         <p class="meta"><a href="/admin">Cancel</a></p>
       </form>
@@ -554,10 +550,6 @@
         </label>
         <label>URL
           <input name="url" required placeholder="https://github.com">
-        </label>
-        <label class="checkbox">
-          <input type="checkbox" name="search_enabled">
-          Enable !keyword search
         </label>
         <button type="submit">Save</button>
       </form>

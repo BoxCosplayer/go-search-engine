@@ -30,7 +30,7 @@ def test_links_post_and_get(client, db_conn):
     rv = client.get("/api/links")
     data = rv.get_json()
     link_map = {item["keyword"]: item for item in data["links"]}
-    assert link_map["gh"]["search_enabled"] is True
+    assert link_map["gh"]["search_enabled"] is False
 
 
 def test_links_post_defaults_search_disabled(client):
@@ -46,7 +46,27 @@ def test_links_post_accepts_string_flag(client, db_conn):
     rv = client.post("/api/links", json=payload)
     assert rv.status_code == 200
     row = db_conn.execute("SELECT search_enabled FROM links WHERE keyword='yt'").fetchone()
+    assert row["search_enabled"] == 0
+
+
+def test_links_post_auto_enables_search_when_template_found(client, db_conn, monkeypatch):
+    from backend.app import opensearch
+
+    monkeypatch.setattr(
+        opensearch,
+        "discover_opensearch_template",
+        lambda _url: ("https://example.com/opensearch.xml", "https://example.com/search?q={searchTerms}"),
+    )
+
+    payload = {"keyword": "ex", "url": "https://example.com"}
+    rv = client.post("/api/links", json=payload)
+    assert rv.status_code == 200
+    row = db_conn.execute(
+        "SELECT search_enabled, opensearch_doc_url, opensearch_template FROM links WHERE keyword='ex'"
+    ).fetchone()
     assert row["search_enabled"] == 1
+    assert row["opensearch_doc_url"] == "https://example.com/opensearch.xml"
+    assert row["opensearch_template"] == "https://example.com/search?q={searchTerms}"
 
 
 def test_links_post_validation_errors(client):
@@ -95,11 +115,11 @@ def test_get_link_and_update_and_delete(client):
     assert rv.status_code == 200
     body = rv.get_json()["link"]
     assert body["keyword"] == "git"
-    assert body["search_enabled"] is True
+    assert body["search_enabled"] is False
 
     rv = client.get("/api/links/git")
     assert rv.status_code == 200
-    assert rv.get_json()["link"]["search_enabled"] is True
+    assert rv.get_json()["link"]["search_enabled"] is False
 
     rv = client.get("/api/links/missing")
     assert rv.status_code == 404
@@ -126,6 +146,32 @@ def test_update_link_validation_and_conflict(client):
     assert rv.status_code == 400
     rv = client.put("/api/links/a", json={"keyword": "multi term", "url": "https://a.com"})
     assert rv.status_code == 400
+
+
+def test_update_link_auto_enables_on_discovery(client, db_conn, monkeypatch):
+    from backend.app import opensearch
+
+    client.post("/api/links", json={"keyword": "gh", "url": "https://github.com"})
+
+    monkeypatch.setattr(
+        opensearch,
+        "discover_opensearch_template",
+        lambda _url: ("https://example.com/opensearch.xml", "https://example.com/search?q={searchTerms}"),
+    )
+    rv = client.put(
+        "/api/links/gh",
+        json={
+            "url": "https://example.com",
+            "title": "Example",
+        },
+    )
+    assert rv.status_code == 200
+    row = db_conn.execute(
+        "SELECT search_enabled, opensearch_doc_url, opensearch_template FROM links WHERE keyword='gh'"
+    ).fetchone()
+    assert row["search_enabled"] == 1
+    assert row["opensearch_doc_url"] == "https://example.com/opensearch.xml"
+    assert row["opensearch_template"] == "https://example.com/search?q={searchTerms}"
 
 
 def test_lists_crud_flow(client, db_conn):

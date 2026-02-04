@@ -11,6 +11,7 @@ from time import perf_counter
 from flask import Blueprint, Response, abort, g, redirect, request, url_for
 from werkzeug.exceptions import BadRequest, HTTPException
 
+from .. import opensearch
 from ..db import get_db
 from ..search_cache import get_cached_suggestions, invalidate_suggestions_cache
 from ..utils import sanitize_query, to_slug
@@ -228,14 +229,14 @@ def _import_shortcuts_from_csv(db, file_storage):
 
     inserted = 0
     updated = 0
+    pending_discovery: list[tuple[int, str]] = []
     for row in reader:
         keyword = (row.get("keyword") or "").strip()
         url = (row.get("url") or "").strip()
         if not keyword or not url:
             continue
         title = (row.get("title") or "").strip()
-        raw_flag = (row.get("search_enabled") or "").strip().lower()
-        search_enabled = 1 if raw_flag in {"1", "true", "yes", "y", "on"} else 0
+        search_enabled = 0
 
         existing_keyword = db.execute(
             "SELECT id FROM links WHERE keyword COLLATE NOCASE = ?",
@@ -267,6 +268,7 @@ def _import_shortcuts_from_csv(db, file_storage):
             )
             link_id = cur.lastrowid
             inserted += 1
+        pending_discovery.append((link_id, url))
 
         duplicates = db.execute(
             "SELECT id FROM links WHERE url COLLATE NOCASE = ? AND id <> ?",
@@ -300,6 +302,9 @@ def _import_shortcuts_from_csv(db, file_storage):
                 (link_id, list_id),
             )
 
+    db.commit()
+    for link_id, link_url in pending_discovery:
+        opensearch.refresh_link_opensearch(db, link_id, link_url)
     return inserted + updated
 
 
@@ -325,10 +330,7 @@ def links():
         keyword = (data.get("keyword") or "").strip()
         url = (data.get("url") or "").strip()
         title = (data.get("title") or "").strip() or None
-        raw_search = data.get("search_enabled")
-        if raw_search is None:
-            raw_search = data.get("searchEnabled")
-        search_enabled = _coerce_bool(raw_search)
+        search_enabled = False
 
         if not keyword or not url:
             abort(400, "keyword and url are required")
@@ -337,10 +339,12 @@ def links():
         if not (url.startswith("http://") or url.startswith("https://")):
             abort(400, "url must start with http:// or https://")
         try:
-            db.execute(
+            cur = db.execute(
                 "INSERT INTO links(keyword, url, title, search_enabled) VALUES (?, ?, ?, ?)",
                 (keyword, url, title, int(search_enabled)),
             )
+            db.commit()
+            opensearch.refresh_link_opensearch(db, cur.lastrowid, url)
             db.commit()
             invalidate_suggestions_cache()
         except sqlite3.IntegrityError:
@@ -381,10 +385,7 @@ def update_link(keyword: str):
     new_keyword = (data.get("keyword") or row["keyword"]).strip()
     new_url = (data.get("url") or row["url"]).strip()
     new_title = (data.get("title") or row["title"] or "").strip() or None
-    raw_search = data.get("search_enabled")
-    if raw_search is None:
-        raw_search = data.get("searchEnabled")
-    new_search_enabled = _coerce_bool(raw_search) if raw_search is not None else bool(row["search_enabled"])
+    new_search_enabled = False
 
     if not new_keyword or not new_url:
         abort(400, "keyword and url are required")  # pragma: no cover
@@ -398,6 +399,10 @@ def update_link(keyword: str):
             "UPDATE links SET keyword=?, url=?, title=?, search_enabled=? WHERE id=?",
             (new_keyword, new_url, new_title, int(new_search_enabled), row["id"]),
         )
+        db.commit()
+        refreshed = opensearch.refresh_link_opensearch(db, row["id"], new_url)
+        if refreshed:
+            new_search_enabled = True
         db.commit()
         invalidate_suggestions_cache()
     except sqlite3.IntegrityError:

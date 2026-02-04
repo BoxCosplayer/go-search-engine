@@ -74,6 +74,7 @@ def ensure_links_schema(db):
     )
     db.commit()
     ensure_search_flag_column(db)
+    ensure_opensearch_columns(db)
 
 
 def ensure_seed_links(db, base_url: str | None = None) -> bool:
@@ -146,6 +147,25 @@ def ensure_search_flag_column(db):
             cols.add(row[1])
     if "search_enabled" not in cols:
         db.execute("ALTER TABLE links ADD COLUMN search_enabled INTEGER NOT NULL DEFAULT 0")
+        db.commit()
+
+
+def ensure_opensearch_columns(db):
+    """Ensure OpenSearch metadata columns exist on the links table."""
+    cols = set()
+    for row in db.execute("PRAGMA table_info(links)"):
+        if hasattr(row, "keys"):
+            cols.add(row["name"])
+        else:  # pragma: no cover -- fallback when row_factory not set
+            cols.add(row[1])
+    updated = False
+    if "opensearch_doc_url" not in cols:
+        db.execute("ALTER TABLE links ADD COLUMN opensearch_doc_url TEXT")
+        updated = True
+    if "opensearch_template" not in cols:
+        db.execute("ALTER TABLE links ADD COLUMN opensearch_template TEXT")
+        updated = True
+    if updated:
         db.commit()
 
 

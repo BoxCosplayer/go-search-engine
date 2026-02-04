@@ -61,6 +61,19 @@ def _fallback_ensure_search_flag_column(conn):
         conn.commit()
 
 
+def _fallback_ensure_opensearch_columns(conn):
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(links)")}
+    updated = False
+    if "opensearch_doc_url" not in cols:
+        conn.execute("ALTER TABLE links ADD COLUMN opensearch_doc_url TEXT")
+        updated = True
+    if "opensearch_template" not in cols:
+        conn.execute("ALTER TABLE links ADD COLUMN opensearch_template TEXT")
+        updated = True
+    if updated:
+        conn.commit()
+
+
 def _fallback_ensure_admin_users_schema(conn):
     conn.execute("""
     CREATE TABLE IF NOT EXISTS admin_users (
@@ -121,6 +134,7 @@ def _fallback_ensure_search_fts(conn):
 
 ensure_lists_schema = _fallback_ensure_lists_schema
 ensure_search_flag_column = _fallback_ensure_search_flag_column
+ensure_opensearch_columns = _fallback_ensure_opensearch_columns
 ensure_admin_users_schema = _fallback_ensure_admin_users_schema
 ensure_search_fts = _fallback_ensure_search_fts
 
@@ -133,6 +147,7 @@ else:
     DB_PATH = _db.DB_PATH
     ensure_lists_schema = _db.ensure_lists_schema
     ensure_search_flag_column = _db.ensure_search_flag_column
+    ensure_opensearch_columns = _db.ensure_opensearch_columns
     ensure_admin_users_schema = _db.ensure_admin_users_schema
     ensure_search_fts = _db.ensure_search_fts
 
@@ -157,6 +172,7 @@ def ensure_schema(conn):
     """)
     conn.commit()
     ensure_search_flag_column(conn)
+    ensure_opensearch_columns(conn)
 
 
 def import_csv(conn, path):
@@ -201,6 +217,7 @@ def main():
         # Also ensure lists schema so admin/lists UIs work out-of-the-box
         ensure_lists_schema(conn)
         ensure_search_flag_column(conn)
+        ensure_opensearch_columns(conn)
         ensure_admin_users_schema(conn)
         ensure_search_fts(conn)
 

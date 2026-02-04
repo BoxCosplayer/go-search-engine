@@ -136,7 +136,7 @@ def test_admin_link_add_edit_delete(client, db_conn):
     assert rv.status_code == 302
     row = db_conn.execute("SELECT url, search_enabled FROM links WHERE keyword='git'").fetchone()
     assert row["url"] == "https://github.com/home"
-    assert row["search_enabled"] == 1
+    assert row["search_enabled"] == 0
 
     rv = client.post("/admin/delete", data={"keyword": "git"})
     assert rv.status_code == 302
@@ -153,7 +153,80 @@ def test_admin_add_sets_search_flag(client, db_conn):
     rv = client.post("/admin/add", data=data)
     assert rv.status_code == 302
     row = db_conn.execute("SELECT search_enabled FROM links WHERE keyword='ddg'").fetchone()
+    assert row["search_enabled"] == 0
+
+
+def test_admin_add_auto_enables_on_discovery(client, db_conn, monkeypatch):
+    from backend.app import opensearch
+
+    monkeypatch.setattr(
+        opensearch,
+        "discover_opensearch_template",
+        lambda _url: ("https://example.com/opensearch.xml", "https://example.com/search?q={searchTerms}"),
+    )
+    data = {"keyword": "ex", "url": "https://example.com", "title": "Example"}
+    rv = client.post("/admin/add", data=data)
+    assert rv.status_code == 302
+    row = db_conn.execute(
+        "SELECT search_enabled, opensearch_doc_url, opensearch_template FROM links WHERE keyword='ex'"
+    ).fetchone()
     assert row["search_enabled"] == 1
+    assert row["opensearch_doc_url"] == "https://example.com/opensearch.xml"
+    assert row["opensearch_template"] == "https://example.com/search?q={searchTerms}"
+
+
+def test_admin_update_ignores_search_flag_when_discovery_missing(client, db_conn):
+    db_conn.execute(
+        "INSERT INTO links(keyword, url, title) VALUES (?, ?, ?)",
+        ("gh", "https://github.com", "GitHub"),
+    )
+    db_conn.commit()
+
+    rv = client.post(
+        "/admin/update",
+        data={
+            "original_keyword": "gh",
+            "keyword": "gh",
+            "url": "https://github.com",
+            "title": "GitHub",
+            "search_enabled": "on",
+        },
+    )
+    assert rv.status_code == 302
+    row = db_conn.execute("SELECT search_enabled FROM links WHERE keyword='gh'").fetchone()
+    assert row["search_enabled"] == 0
+
+
+def test_admin_update_auto_enables_on_discovery(client, db_conn, monkeypatch):
+    from backend.app import opensearch
+
+    db_conn.execute(
+        "INSERT INTO links(keyword, url, title) VALUES (?, ?, ?)",
+        ("gh", "https://github.com", "GitHub"),
+    )
+    db_conn.commit()
+
+    monkeypatch.setattr(
+        opensearch,
+        "discover_opensearch_template",
+        lambda _url: ("https://example.com/opensearch.xml", "https://example.com/search?q={searchTerms}"),
+    )
+    rv = client.post(
+        "/admin/update",
+        data={
+            "original_keyword": "gh",
+            "keyword": "gh",
+            "url": "https://example.com",
+            "title": "Example",
+        },
+    )
+    assert rv.status_code == 302
+    row = db_conn.execute(
+        "SELECT search_enabled, opensearch_doc_url, opensearch_template FROM links WHERE keyword='gh'"
+    ).fetchone()
+    assert row["search_enabled"] == 1
+    assert row["opensearch_doc_url"] == "https://example.com/opensearch.xml"
+    assert row["opensearch_template"] == "https://example.com/search?q={searchTerms}"
 
 
 def test_admin_add_validation_and_duplicate(client, db_conn):

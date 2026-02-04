@@ -4,10 +4,9 @@ import os
 from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
-from urllib.parse import quote_plus
 
 import pytest
-from backend.app import main
+from backend.app import main, opensearch
 from backend.app.db import ensure_admin_users_schema
 from werkzeug.security import generate_password_hash
 
@@ -155,7 +154,7 @@ def test_import_shortcuts_csv(client, db_conn):
         ("gh",),
     ).fetchone()
     assert existing["title"] == "GitHub Updated"
-    assert existing["search_enabled"] == 1
+    assert existing["search_enabled"] == 0
     assert (
         db_conn.execute(
             "SELECT url FROM links WHERE keyword=?",
@@ -232,7 +231,7 @@ def test_import_shortcuts_prioritises_new_keyword_on_url_conflict(client, db_con
         ("https://github.com",),
     ).fetchone()
     assert row["keyword"] == "github"
-    assert row["search_enabled"] == 1
+    assert row["search_enabled"] == 0
 
 
 def test_import_shortcuts_replaces_existing_lists(client, db_conn):
@@ -268,13 +267,13 @@ def test_go_exact_match_redirects(client, db_conn):
     assert rv.headers["Location"] == "https://github.com"
 
 
-def test_go_bang_search_redirects_when_enabled(client, db_conn, monkeypatch):
+def test_go_bang_search_redirects_when_enabled(client, db_conn):
     add_link(db_conn, "gh", "https://github.com", "GitHub", search_enabled=True)
-
-    def fake_lookup(url, terms):
-        return f"https://github.com/search?q={quote_plus(terms)}"
-
-    monkeypatch.setattr(main, "_lookup_opensearch_search_url", fake_lookup)
+    db_conn.execute(
+        "UPDATE links SET opensearch_doc_url=?, opensearch_template=? WHERE keyword='gh'",
+        ("https://github.com/opensearch.xml", "https://github.com/search?q={searchTerms}"),
+    )
+    db_conn.commit()
     rv = client.get("/go", query_string={"q": "!gh cats & dogs"})
     assert rv.status_code == 302
     assert rv.headers["Location"] == "https://github.com/search?q=cats+%26+dogs"
@@ -287,9 +286,8 @@ def test_go_bang_falls_back_when_disabled(client, db_conn):
     assert rv.headers["Location"] == "https://github.com"
 
 
-def test_go_bang_falls_back_when_lookup_fails(client, db_conn, monkeypatch):
+def test_go_bang_falls_back_when_lookup_fails(client, db_conn):
     add_link(db_conn, "gh", "https://github.com", "GitHub", search_enabled=True)
-    monkeypatch.setattr(main, "_lookup_opensearch_search_url", lambda *_: None)
     rv = client.get("/go", query_string={"q": "!gh cats"})
     assert rv.status_code == 302
     assert rv.headers["Location"] == "https://github.com"
@@ -457,7 +455,7 @@ def test_opensearch_suggest_blank_query(client):
 
 
 def test_lookup_opensearch_search_url_interpolates(monkeypatch):
-    main._get_opensearch_template.cache_clear()
+    opensearch._get_opensearch_template.cache_clear()
     xml = """<?xml version='1.0'?>
     <OpenSearchDescription xmlns='http://a9.com/-/spec/opensearch/1.1/'>
       <Url type='text/html' method='get' template='/search?q={searchTerms}&amp;lang=en{&amp;foo?}' />
@@ -468,18 +466,19 @@ def test_lookup_opensearch_search_url_interpolates(monkeypatch):
         assert url == "https://example.com/opensearch.xml"
         return xml
 
-    monkeypatch.setattr(main, "_download_opensearch_document", fake_download)
-    result = main._lookup_opensearch_search_url("https://example.com/home", "cats & dogs")
+    monkeypatch.setattr(opensearch, "_download_opensearch_document", fake_download)
+    result = opensearch._lookup_opensearch_search_url("https://example.com/home", "cats & dogs")
     assert result == "https://example.com/search?q=cats+%26+dogs&lang=en"
-    assert main._lookup_opensearch_search_url("file://local", "cats") is None
-    main._get_opensearch_template.cache_clear()
+    assert opensearch._lookup_opensearch_search_url("file://local", "cats") is None
+    opensearch._get_opensearch_template.cache_clear()
 
 
 def test_opensearch_document_url_handles_paths():
     assert (
-        main._opensearch_document_url("https://example.com/opensearch.xml") == "https://example.com/opensearch.xml"
+        opensearch._opensearch_document_url("https://example.com/opensearch.xml")
+        == "https://example.com/opensearch.xml"
     )
-    assert main._opensearch_document_url("file:///tmp/site.xml") is None
+    assert opensearch._opensearch_document_url("file:///tmp/site.xml") is None
 
 
 def test_download_opensearch_document(monkeypatch):
@@ -488,36 +487,36 @@ def test_download_opensearch_document(monkeypatch):
             self.encoding = "utf-8"
             self.content = b"<root/>"
 
-    monkeypatch.setattr(main, "_http_get", lambda url: FakeResponse())
-    text = main._download_opensearch_document("https://example.com/opensearch.xml")
+    monkeypatch.setattr(opensearch, "_http_get", lambda url: FakeResponse())
+    text = opensearch._download_opensearch_document("https://example.com/opensearch.xml")
     assert text == "<root/>"
 
 
 def test_get_opensearch_template_handles_error(monkeypatch):
-    main._get_opensearch_template.cache_clear()
+    opensearch._get_opensearch_template.cache_clear()
 
     def boom(_url):
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(main, "_download_opensearch_document", boom)
-    assert main._get_opensearch_template("https://example.com/opensearch.xml") is None
-    main._get_opensearch_template.cache_clear()
+    monkeypatch.setattr(opensearch, "_download_opensearch_document", boom)
+    assert opensearch._get_opensearch_template("https://example.com/opensearch.xml") is None
+    opensearch._get_opensearch_template.cache_clear()
 
 
 def test_http_get_fallback(monkeypatch):
     class BadResp:
         status_code = 403
 
-    monkeypatch.setattr(main, "_HTTP_CLIENT", SimpleNamespace(get=lambda _url: BadResp()))
-    monkeypatch.setattr(main, "tls_client", None, raising=False)
+    monkeypatch.setattr(opensearch, "_HTTP_CLIENT", SimpleNamespace(get=lambda _url: BadResp()))
+    monkeypatch.setattr(opensearch, "tls_client", None, raising=False)
 
     class GoodCurlResp:
         status_code = 200
         content = b"ok"
         encoding = "utf-8"
 
-    monkeypatch.setattr(main, "curl_requests", SimpleNamespace(get=lambda *a, **k: GoodCurlResp()))
-    resp = main._http_get("https://fallback.example.com")
+    monkeypatch.setattr(opensearch, "curl_requests", SimpleNamespace(get=lambda *a, **k: GoodCurlResp()))
+    resp = opensearch._http_get("https://fallback.example.com")
     assert resp.status_code == 200
     assert resp.content == b"ok"
 
@@ -526,18 +525,18 @@ def test_http_get_no_fallback(monkeypatch):
     class BadResp:
         status_code = 403
 
-    monkeypatch.setattr(main, "_HTTP_CLIENT", SimpleNamespace(get=lambda _url: BadResp()))
-    monkeypatch.setattr(main, "curl_requests", None)
-    monkeypatch.setattr(main, "tls_client", None, raising=False)
-    assert main._http_get("https://blocked.example.com") is None
+    monkeypatch.setattr(opensearch, "_HTTP_CLIENT", SimpleNamespace(get=lambda _url: BadResp()))
+    monkeypatch.setattr(opensearch, "curl_requests", None)
+    monkeypatch.setattr(opensearch, "tls_client", None, raising=False)
+    assert opensearch._http_get("https://blocked.example.com") is None
 
 
 def test_http_get_tls_client_fallback(monkeypatch):
     class BadResp:
         status_code = 403
 
-    monkeypatch.setattr(main, "_HTTP_CLIENT", SimpleNamespace(get=lambda _url: BadResp()))
-    monkeypatch.setattr(main, "curl_requests", None)
+    monkeypatch.setattr(opensearch, "_HTTP_CLIENT", SimpleNamespace(get=lambda _url: BadResp()))
+    monkeypatch.setattr(opensearch, "curl_requests", None)
 
     class FakeSession:
         def __init__(self, client_identifier):
@@ -547,8 +546,8 @@ def test_http_get_tls_client_fallback(monkeypatch):
             return SimpleNamespace(status_code=200, content=b"tls", encoding="utf-8")
 
     fake_tls = SimpleNamespace(Session=FakeSession)
-    monkeypatch.setattr(main, "tls_client", fake_tls)
-    resp = main._http_get("https://tls.example.com")
+    monkeypatch.setattr(opensearch, "tls_client", fake_tls)
+    resp = opensearch._http_get("https://tls.example.com")
     assert resp.status_code == 200
     assert resp.content == b"tls"
 
@@ -564,8 +563,8 @@ def test_candidate_opensearch_document_urls_from_html(monkeypatch):
     def fake_fetch(url):
         return html if "example.com" in url else None
 
-    monkeypatch.setattr(main, "_fetch_html", fake_fetch)
-    docs = main._candidate_opensearch_document_urls("https://example.com/wiki/Foo")
+    monkeypatch.setattr(opensearch, "_fetch_html", fake_fetch)
+    docs = opensearch._candidate_opensearch_document_urls("https://example.com/wiki/Foo")
     assert "https://example.com/os.xml" in docs
     assert "https://example.com/script.xml" in docs
 
@@ -590,27 +589,27 @@ def test_lookup_opensearch_uses_discovered_link(monkeypatch):
 """
         raise RuntimeError("missing descriptor")
 
-    monkeypatch.setattr(main, "_fetch_html", fake_fetch)
-    monkeypatch.setattr(main, "_download_opensearch_document", fake_download)
-    main._get_opensearch_template.cache_clear()
-    result = main._lookup_opensearch_search_url("https://example.com/wiki/Foo", "cats")
+    monkeypatch.setattr(opensearch, "_fetch_html", fake_fetch)
+    monkeypatch.setattr(opensearch, "_download_opensearch_document", fake_download)
+    opensearch._get_opensearch_template.cache_clear()
+    result = opensearch._lookup_opensearch_search_url("https://example.com/wiki/Foo", "cats")
     assert result == "https://example.com/search?q=cats"
-    main._get_opensearch_template.cache_clear()
+    opensearch._get_opensearch_template.cache_clear()
 
 
 def test_parse_opensearch_link_hrefs_filters_non_search():
     html = "<html><head><link rel='stylesheet' href='/style.css'></head></html>"
-    assert main._parse_opensearch_link_hrefs(html) == []
+    assert opensearch._parse_opensearch_link_hrefs(html) == []
 
 
 def test_parse_opensearch_link_hrefs_filters_wrong_type():
     html = "<html><head><link rel='search' type='text/html' href='/ignored.xml'></head></html>"
-    assert main._parse_opensearch_link_hrefs(html) == []
+    assert opensearch._parse_opensearch_link_hrefs(html) == []
 
 
 def test_parse_opensearch_script_hrefs_extracts():
     html = 'var StackExchange = {opensearchUrl:"\\/search.xml"};'
-    assert main._parse_opensearch_script_hrefs(html) == ["/search.xml"]
+    assert opensearch._parse_opensearch_script_hrefs(html) == ["/search.xml"]
 
 
 def test_extract_search_template_variants():
@@ -621,31 +620,60 @@ def test_extract_search_template_variants():
     <Url template='/skip' method='get' type='text/html' />
     <Url template='/search?q={searchTerms}' method='get' type='text/html' />
     </OpenSearchDescription>"""
-    assert main._extract_search_template(doc) == "/search?q={searchTerms}"
-    assert main._extract_search_template("not xml") is None
+    assert opensearch._extract_search_template(doc) == "/search?q={searchTerms}"
+    assert opensearch._extract_search_template("not xml") is None
     doc_no_match = """<OpenSearchDescription xmlns='http://a9.com/-/spec/opensearch/1.1/'>
     <Url template='/plain' method='get' type='text/html' />
     </OpenSearchDescription>"""
-    assert main._extract_search_template(doc_no_match) is None
+    assert opensearch._extract_search_template(doc_no_match) is None
 
 
 def test_strip_optional_placeholders_variants():
-    assert main._strip_optional_placeholders("plain") == "plain"
+    assert opensearch._strip_optional_placeholders("plain") == "plain"
     template = "{keep} {drop?} trailing{"
-    assert main._strip_optional_placeholders(template) == "{keep}  trailing{"
+    assert opensearch._strip_optional_placeholders(template) == "{keep}  trailing{"
 
 
 def test_build_search_url_requires_placeholder():
-    assert main._build_search_url("https://example.com/opensearch.xml", "/search", "cats") is None
+    assert opensearch._build_search_url("https://example.com/opensearch.xml", "/search", "cats") is None
 
 
 def test_lookup_opensearch_requires_terms():
-    assert main._lookup_opensearch_search_url("https://example.com", "") is None
+    assert opensearch._lookup_opensearch_search_url("https://example.com", "") is None
 
 
 def test_lookup_opensearch_handles_missing_template(monkeypatch):
-    monkeypatch.setattr(main, "_get_opensearch_template", lambda _url: None)
-    assert main._lookup_opensearch_search_url("https://example.com", "cats") is None
+    monkeypatch.setattr(opensearch, "_get_opensearch_template", lambda _url: None)
+    assert opensearch._lookup_opensearch_search_url("https://example.com", "cats") is None
+
+
+def test_refresh_link_opensearch_clears_template_on_failure(app_ctx, db_conn, monkeypatch):
+    db_conn.execute(
+        """
+        INSERT INTO links(keyword, url, title, search_enabled, opensearch_doc_url, opensearch_template)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (
+            "gh",
+            "https://github.com",
+            "GitHub",
+            1,
+            "https://example.com/opensearch.xml",
+            "https://example.com/search?q={searchTerms}",
+        ),
+    )
+    db_conn.commit()
+
+    monkeypatch.setattr(opensearch, "discover_opensearch_template", lambda _url: None)
+    link_id = db_conn.execute("SELECT id FROM links WHERE keyword='gh'").fetchone()["id"]
+    opensearch.refresh_link_opensearch(db_conn, link_id, "https://github.com")
+
+    row = db_conn.execute(
+        "SELECT search_enabled, opensearch_doc_url, opensearch_template FROM links WHERE keyword='gh'"
+    ).fetchone()
+    assert row["search_enabled"] == 0
+    assert row["opensearch_doc_url"] is None
+    assert row["opensearch_template"] is None
 
 
 def test_handle_bang_query_guard_conditions(db_conn):
@@ -656,7 +684,9 @@ def test_handle_bang_query_guard_conditions(db_conn):
           keyword TEXT NOT NULL UNIQUE,
           url TEXT NOT NULL,
           title TEXT,
-          search_enabled INTEGER NOT NULL DEFAULT 0
+          search_enabled INTEGER NOT NULL DEFAULT 0,
+          opensearch_doc_url TEXT,
+          opensearch_template TEXT
         );
         """
     )

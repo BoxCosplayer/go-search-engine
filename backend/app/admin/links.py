@@ -2,6 +2,7 @@ import sqlite3
 
 from flask import redirect, request
 
+from .. import opensearch
 from ..db import get_db
 from ..search_cache import invalidate_suggestions_cache
 from . import admin_bp
@@ -14,7 +15,7 @@ def admin_add():
     keyword = (request.form.get("keyword") or "").strip()
     title = (request.form.get("title") or "").strip() or None
     url = (request.form.get("url") or "").strip()
-    search_enabled = int(bool(request.form.get("search_enabled")))
+    search_enabled = 0
 
     if not keyword or not url:
         return admin_error("Keyword and URL required", 400)
@@ -23,10 +24,12 @@ def admin_add():
 
     db = get_db()
     try:
-        db.execute(
+        cur = db.execute(
             "INSERT INTO links(keyword, url, title, search_enabled) VALUES (?, ?, ?, ?)",
             (keyword, url, title, search_enabled),
         )
+        db.commit()
+        opensearch.refresh_link_opensearch(db, cur.lastrowid, url)
         db.commit()
         invalidate_suggestions_cache()
     except Exception:
@@ -54,7 +57,7 @@ def admin_update():
     keyword = (request.form.get("keyword") or "").strip()
     url = (request.form.get("url") or "").strip()
     title = (request.form.get("title") or "").strip() or None
-    search_enabled = int(bool(request.form.get("search_enabled")))
+    search_enabled = 0
 
     if not original or not keyword or not url:
         return admin_error("original_keyword, keyword and url are required", 400)
@@ -74,6 +77,8 @@ def admin_update():
             "UPDATE links SET keyword=?, url=?, title=?, search_enabled=? WHERE id=?",
             (keyword, url, title, search_enabled, row["id"]),
         )
+        db.commit()
+        opensearch.refresh_link_opensearch(db, row["id"], url)
         db.commit()
         invalidate_suggestions_cache()
     except sqlite3.IntegrityError:
