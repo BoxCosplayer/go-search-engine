@@ -69,6 +69,14 @@ def test_config(monkeypatch, tmp_path):
     return prepare_test_config(monkeypatch, tmp_path)
 
 
+@pytest.fixture(autouse=True)
+def disable_opensearch_discovery(monkeypatch):
+    """Disable networked OpenSearch discovery during tests."""
+    from backend.app import opensearch
+
+    monkeypatch.setattr(opensearch, "discover_opensearch_template", lambda _url: None)
+
+
 @pytest.fixture()
 def app_ctx(test_config):
     """Provide a Flask app context with initialized schema."""

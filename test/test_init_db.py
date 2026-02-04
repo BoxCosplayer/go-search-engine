@@ -50,6 +50,8 @@ def test_ensure_schema_creates_links_table(tmp_path):
     assert row[0] == "links"
     columns = {info[1] for info in conn.execute("PRAGMA table_info(links)")}
     assert "search_enabled" in columns
+    assert "opensearch_doc_url" in columns
+    assert "opensearch_template" in columns
     conn.close()
 
 
@@ -94,6 +96,8 @@ def test_main_initializes_database(tmp_path, monkeypatch):
     conn = sqlite3.connect(db_file)
     cols = {row[1] for row in conn.execute("PRAGMA table_info(links)")}
     assert "search_enabled" in cols
+    assert "opensearch_doc_url" in cols
+    assert "opensearch_template" in cols
     conn.close()
 
 
@@ -143,8 +147,11 @@ def test_fallback_helpers_create_schema(tmp_path):
         """
     )
     init_db._fallback_ensure_search_flag_column(conn)
+    init_db._fallback_ensure_opensearch_columns(conn)
     cols = {row[1] for row in conn.execute("PRAGMA table_info(links)")}
     assert "search_enabled" in cols
+    assert "opensearch_doc_url" in cols
+    assert "opensearch_template" in cols
     conn.close()
 
 

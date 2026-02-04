@@ -107,6 +107,7 @@ When `admin-auth-enabled` is true, `/admin` requires HTTP Basic Auth. If no admi
 - `backend/app/db.py` owns SQLite connections and schema helpers; `init_db.py` can seed or import CSV data and ensures the lists schema.
 - `backend/wsgi.py` is the production entry point, `app.py` is a compatibility shim, and `go-server.spec` bundles templates for the EXE.
 - Request flow is simple: `/go` looks up the keyword in SQLite and redirects (or uses the fallback URL), while `/admin` and `/api` mutate the same database.
+- When links are added or updated, OpenSearch discovery runs once and stores templates so bangs can initiaite a search after redirect where possible
 
 ## Want to contribute?
 
@@ -119,10 +120,11 @@ When `admin-auth-enabled` is true, `/admin` requires HTTP Basic Auth. If no admi
 Recommended Test / Linting suite for CI
 
 ```bash
+.\.venv\Scripts\activate
 python -m coverage run -m pytest            # Alternatively: .\.venv\Scripts\python.exe -m coverage run -m pytest
 coverage report --fail-under=90
-ruff check backend
-ruff format backend
+ruff check .
+ruff format .
 bandit -r backend app.py init_db.py
 pip-audit --strict
 ```
