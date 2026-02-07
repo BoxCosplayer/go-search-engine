@@ -610,7 +610,7 @@ def go():
     if exact:
         return _redirect_to_url(exact["url"])
 
-    # Collect suggestions (prefix/substring matches on keyword/title/url)
+    # Collect suggestions (keyword/title substring matches)
     suggestions = _search_suggestions(db, q)
 
     fallback_url = ""
