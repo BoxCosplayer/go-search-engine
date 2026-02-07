@@ -241,6 +241,7 @@
     <div class="card">
       <h2>Add user</h2>
       <form method="post" action="{{ url_for('admin.admin_users_add') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <label>Username
           <input name="username" type="text" autocomplete="username" required>
         </label>
@@ -270,16 +271,19 @@
           <td>
             <div class="actions">
               <form class="inline-form" method="post" action="{{ url_for('admin.admin_users_password') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="username" value="{{ user['username'] }}">
                 <input name="password" type="password" placeholder="New password" autocomplete="new-password" required>
                 <button type="submit">Set password</button>
               </form>
               <form method="post" action="{{ url_for('admin.admin_users_toggle') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="username" value="{{ user['username'] }}">
                 <input type="hidden" name="is_active" value="{{ '0' if user['is_active'] else '1' }}">
                 <button type="submit">{{ 'Disable' if user['is_active'] else 'Enable' }}</button>
               </form>
               <form method="post" action="{{ url_for('admin.admin_users_delete') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="username" value="{{ user['username'] }}">
                 <button class="danger" type="submit"
                   onclick="return confirm('Delete {{ user['username'] }}?')">Delete</button>

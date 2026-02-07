@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import re
+import secrets
 import shutil
 import string
 import subprocess  # nosec B404
@@ -126,6 +127,14 @@ def get_log_level() -> str:
     return value or "INFO"
 
 
+def get_secret_key() -> str:
+    """Return the secret key used for session signing."""
+    override = os.environ.get("GO_SECRET_KEY")
+    if override:
+        return override.strip()
+    return (getattr(config, "secret_key", "") or "").strip()  # type: ignore[name-defined]
+
+
 _DEFAULT_CONFIG = {
     "host": "127.0.0.1",
     "port": 5000,
@@ -134,10 +143,12 @@ _DEFAULT_CONFIG = {
     "fallback-url": "",
     "file-allow": [],
     "admin-auth-enabled": False,
+    "secret-key": "",
     "log-level": "INFO",
     "log-file": "",
 }
 _TRAILING_PUNCT_CHARS = string.whitespace + "'\"`#@)]},.!?:;"
+_SUPPORTED_REDIRECT_SCHEMES = ("http://", "https://", "file://")
 
 
 def sanitize_query(raw: str) -> str:
@@ -188,6 +199,12 @@ def file_url_to_path(url: str) -> str:
     return os.path.normpath(path)
 
 
+def is_supported_redirect_url(url: str) -> bool:
+    """Return True when URL starts with a supported redirect scheme."""
+    value = (url or "").strip()
+    return value.startswith(_SUPPORTED_REDIRECT_SCHEMES)
+
+
 def is_allowed_path(path: str) -> bool:
     """Return True if path is within any configured allowed root.
 
@@ -232,6 +249,7 @@ class GoConfig(BaseModel):
     fallback_url: str = Field("", alias="fallback-url")
     file_allow: list[str] = Field(default_factory=list, alias="file-allow")
     admin_auth_enabled: bool = Field(False, alias="admin-auth-enabled")
+    secret_key: str = Field("", alias="secret-key")
     log_level: str = Field("INFO", alias="log-level")
     log_file: str = Field("", alias="log-file")
 
@@ -322,6 +340,10 @@ def _ensure_config_file_exists() -> Path:
     data.pop("db-path", None)
     data.pop("db_path", None)
 
+    # Generate a per-install secret key when one is not provided.
+    if not (data.get("secret-key") or "").strip():
+        data["secret-key"] = secrets.token_urlsafe(48)
+
     payload = json.dumps(data, indent=4) + "\n"
     try:
         cfg_path.write_text(payload, encoding="utf-8")
@@ -339,6 +361,14 @@ def load_config() -> GoConfig:
         raise FileNotFoundError(f"Config file not found: {cfg_path}") from e
     except json.JSONDecodeError as e:
         raise ValueError(f"Invalid JSON in {cfg_path}: {e}") from e
+
+    if not os.environ.get("GO_SECRET_KEY") and not (data.get("secret-key") or "").strip():
+        data["secret-key"] = secrets.token_urlsafe(48)
+        try:
+            cfg_path.write_text(json.dumps(data, indent=4) + "\n", encoding="utf-8")
+        except OSError as exc:  # pragma: no cover - filesystem guard
+            logger.warning("Failed to persist generated secret key to %s: %s", cfg_path, exc)
+
     try:
         loaded = GoConfig(**data)
     except ValidationError as e:

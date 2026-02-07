@@ -518,6 +518,7 @@
     {% endif %}
     <form id="importCsvForm" action="{{ url_for('import_shortcuts_csv') }}" method="post" enctype="multipart/form-data"
       style="display:none;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input id="importCsvFile" type="file" name="file" accept=".csv">
     </form>
 
@@ -526,6 +527,7 @@
       {% if edit_row %}
       <form action="/admin/update" method="post" class="add-form">
         <h2>Edit link</h2>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="original_keyword" value="{{ edit_row['keyword'] }}">
         <label>Keyword
           <input name="keyword" required value="{{ edit_row['keyword'] }}">
@@ -542,6 +544,7 @@
       {% else %}
       <form action="/admin/add" method="post" class="add-form">
         <h2>Add link</h2>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <label>Keyword
           <input name="keyword" required placeholder="gh">
         </label>
@@ -558,6 +561,7 @@
       <!-- Create list -->
       <form action="/admin/list-add" method="post" class="list-form">
         <h2>Create list</h2>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <label>Name
           <input name="name" placeholder="Work Projects">
         </label>
@@ -608,6 +612,7 @@
           <td>
             <div class="lists-edit">
               <form action="/admin/set-lists" method="post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="keyword" value="{{row['keyword']}}">
                 <input class="lists-input" name="slugs" list="lists_suggestions" placeholder="comma,separated"
                   value="{{row['lists_csv']}}">
@@ -628,6 +633,7 @@
               <button type="submit">Edit</button>
             </form>
             <form action="/admin/delete" method="post">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <input type="hidden" name="keyword" value="{{row['keyword']}}">
               <button class="danger" type="submit"
                 onclick="return confirm('Delete {{row[',keyword,']}}?')">Delete</button>

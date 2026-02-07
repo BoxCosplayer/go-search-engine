@@ -1,47 +1,187 @@
-# Effective Agents Guide
+# AGENTS.md
 
-This project may rely on automation or AI-assisted agents to keep the codebase consistent and fully covered. Use this document as a guide when driving those agents.
+## Purpose
+This file is the current agent operating guide for `go-search-engine`.
+It now includes a full audit baseline from **February 7, 2026** and replaces older assumptions that no longer match the codebase.
 
-## Project Snapshot
-- Stack: Python (3.11+ CI, 3.13 local), Flask, SQLite, PyInstaller.
-- Layout: `backend/app` holds blueprints (`admin`, `api`, `lists`) and shared modules (`main.py`, `db.py`, `utils.py`).
-- Admin blueprint is split by concern (`home.py`, `config_routes.py`, `links.py`, `lists.py`) with re-exports in `backend/app/admin/__init__.py`.
-- Tests live under `test/` and must keep `coverage run -m pytest` at 90%.
+## Current Reality (Verified)
+- Stack: Python 3.11+ (CI), Flask, SQLite, Waitress, PyInstaller.
+- Main app wiring: `backend/app/main.py`.
+- Blueprints:
+  - `admin` in `backend/app/admin/__init__.py`
+  - `api` in `backend/app/api/__init__.py`
+  - `lists` in `backend/app/lists/__init__.py`
+- Admin modules are now: `auth.py`, `home.py`, `config_routes.py`, `links.py`, `lists.py`, `users.py`.
+- Coverage gate in CI is still 90%, but current suite is much higher.
 
-## Agent Workflow
-1. **Sync context first**
-   - Inspect open PR notes, `CHANGELOG.md`, and `todos.md`.
-   - Read the relevant module before editing; many helpers are re-exported for compatibility.
-2. **Plan concretely**
-   - Break work into small, verifiable steps.
-   - Note dependencies (e.g., schema helpers in `backend/app/db.py`).
-3. **Edit safely**
-   - Prefer targeted patches (`apply_patch` or equivalent) and keep imports sorted.
-   - Maintain ASCII unless the surrounding file already uses Unicode.
-   - For admin routes, update the respective module and consider the re-export list in `backend/app/admin/__init__.py`.
-4. **Keep docs in sync**
-   - Update README snippets, CHANGELOG entries, and API docs when behavior changes.
-   - Surface new CLI flags or environment expectations here for future agents.
-   - When a release or feature warrants a version bump, update the app version constant in `backend/app/__init__.py` alongside the changelog.
-   - If configuration keys change, update `config-template.txt`, reflect the new values in `README.md`, and adjust fixtures (see `test/conftest.py`) so tests reference the right defaults.
-   - Keep the README Quick start sections aligned with reality: verify the EXE bundle still ships with `config-template.txt` and that development setup commands remain accurate.
-   - Before tagging a release, run a checklist: bump the version constant, finalize the changelog entry, rebuild the PyInstaller artifact via `go-server.spec`, execute coverage/ruff gates, and smoke-test the EXE (config creation, CSV export, search bangs).
-   - When tooling or dependencies move, update `.github/workflows/ci.yml` and `requirements.txt` so automation stays current.
+## Incorrect Assumptions From Prior Guide
+- Old assumption: admin blueprint concerns are only `home/config_routes/links/lists`.
+  - Actual: admin auth and user lifecycle are first-class (`backend/app/admin/auth.py`, `backend/app/admin/users.py`).
+- Old assumption: this is mainly a no-auth admin UI.
+  - Actual behavior is mixed and requires careful review. README still contains contradictory messaging.
+- Old guide did not call out critical security drift around API auth and CSRF.
 
-## Testing & Quality Gates
-- Always run `.\.venv\Scripts\python.exe -m coverage run -m pytest` (or `python -m coverage run -m pytest` on Linux) after code changes.
-- Follow up with `coverage report --fail-under=90`. CI enforces 90% coverage via `.github/workflows/ci.yml`.
-- Ruff is configured via `.ruff.toml`; run `ruff check`/`ruff format` after touching Python code.
+## Audit Baseline (2026-02-07)
+Commands run locally:
+- `.\.venv\Scripts\python.exe -m coverage run -m pytest`
+- `.\.venv\Scripts\python.exe -m coverage report --fail-under=90`
+- `.\.venv\Scripts\ruff.exe check .`
+- `.\.venv\Scripts\ruff.exe format --check .`
+- `.\.venv\Scripts\bandit.exe -r backend app.py init_db.py`
+- `.\.venv\Scripts\pip-audit.exe --strict`
 
-## Common Scenarios
-- **Adding admin endpoints**: place handlers in a dedicated module, import it from `backend/app/admin/__init__.py`, and expose the callable through the re-export list.
-- **Modifying configuration helpers**: adjust `backend/app/utils.py`, ensure fixtures in `test/conftest.py` still patch the right attributes, and extend tests to exercise new branches.
-- **Extending the API**: update `backend/app/api/__init__.py`, add route tests in `test/test_api.py`, and document payloads in README.
-- **Database changes**: revise schema migrations in `init_db.py`, adjust `ensure_lists_schema` or related helpers, and cover the change with both unit tests and integration tests.
+Observed results:
+- Tests: **189 passed**
+- Coverage: **99% total**
+- Ruff: clean
+- Bandit: no findings
+- pip-audit: no known vulnerabilities
 
-## Reporting & Notes
-- Record significant decisions in `CHANGELOG.md`.
-- Use `todos.md` for longer-running follow-ups; keep entries actionable.
-- Log coverage adjustments or temporary skips directly in commit/PR descriptions.
+Important caveat:
+- `backend/app/search_cache.py` has only **77%** coverage despite high aggregate coverage.
 
-Sticking to this checklist keeps agent-driven changes predictable, testable, and aligned with the repository's guarantees. Feel free to expand this guide as new automation patterns emerge.
+## Security Findings (Prioritized)
+
+### P0 - API auth bypass when admin auth is enabled
+Evidence:
+- API blueprint is registered directly with no auth wrapper: `backend/app/main.py:206`
+- Admin blueprint explicitly enforces auth: `backend/app/admin/__init__.py:10-12`
+- API routes mutate data without auth guard (for example):
+  - `backend/app/api/__init__.py:329`
+  - `backend/app/api/__init__.py:461`
+  - `backend/app/api/__init__.py:477`
+  - `backend/app/api/__init__.py:528`
+
+Risk:
+- If service is reachable off-host, unauthenticated callers can create/update/delete links and lists even with admin auth enabled.
+
+### P0 - No CSRF protection on state-changing forms
+Evidence:
+- POST admin/list forms exist with no CSRF token mechanism:
+  - `backend/app/templates/admin/index.html:519`
+  - `backend/app/templates/admin/index.html:527`
+  - `backend/app/templates/admin/index.html:543`
+  - `backend/app/templates/admin/index.html:559`
+  - `backend/app/templates/admin/users.html:243`
+  - `backend/app/templates/lists/index.html:121`
+  - `backend/app/templates/lists/view.html:142`
+- No CSRF framework references found in app code.
+
+Risk:
+- Browser-authenticated admins can be forced to submit destructive POSTs from malicious pages.
+
+### P1 - First-credential bootstrap can be remotely claimed
+Evidence:
+- Empty `admin_users` table + provided Basic auth creates first admin user:
+  - `backend/app/admin/auth.py:75`
+  - `backend/app/admin/auth.py:95-99`
+
+Risk:
+- On first deployment, any reachable client that sends credentials first can become admin.
+
+### P1 - Admin link add/update accepts arbitrary URL schemes
+Evidence:
+- Admin form handlers only check non-empty URL, not scheme:
+  - `backend/app/admin/links.py:17-18`
+  - `backend/app/admin/links.py:65-67`
+- Redirect helper will redirect unknown schemes by default:
+  - `backend/app/main.py:216-218`
+  - `backend/app/main.py:255`
+
+Risk:
+- Malicious or unsafe schemes can be stored and executed via user click flow.
+
+### P2 - Host header trust in generated URLs
+Evidence:
+- List URL generation uses `request.host_url` directly:
+  - `backend/app/admin/lists.py:26`
+  - `backend/app/admin/lists.py:62`
+  - `backend/app/api/__init__.py:508`
+  - `backend/app/api/__init__.py:579`
+- OpenSearch description also uses host-derived URL:
+  - `backend/app/api/__init__.py:733`
+
+Risk:
+- Incorrect absolute URL generation or poisoning in proxied deployments without strict host validation.
+
+## Maintenance Findings
+
+### Config reload semantics are inconsistent
+Evidence:
+- Module constants captured at import:
+  - `backend/app/main.py:83`
+  - `backend/app/main.py:84`
+- Runtime config is mutable in admin:
+  - `backend/app/admin/config_routes.py:96`
+
+Impact:
+- Saving config does not reliably update all runtime behavior until restart (for example fallback URL and file-access flag paths depending on constant usage).
+
+### API module is too large and multi-purpose
+Evidence:
+- `backend/app/api/__init__.py` handles route registration, CSV import/export, suggestion engine, OpenSearch endpoints, and logging concerns in one file.
+
+Impact:
+- Harder code review, riskier edits, less isolated tests, more accidental regressions.
+
+### Duplicate config loading concepts
+Evidence:
+- `backend/app/utils.py:333` defines canonical config load.
+- `backend/app/main.py:162` has another `load_config()` that is separate and easy to drift.
+
+Impact:
+- Confusing source of truth and higher long-term drift risk.
+
+### Broad exception handling hides causes
+Examples:
+- `backend/app/admin/links.py` wraps broad exceptions for duplicate behavior.
+- `backend/app/admin/lists.py:77` suppresses all exceptions when creating list shortcut links.
+
+Impact:
+- Operational debugging and root-cause analysis becomes slower.
+
+## DX Findings
+- No typed static analysis gate (mypy/pyright) despite complex cross-module state.
+- Runtime and dev/security dependencies are combined in a single `requirements.txt`.
+- No fast local task runner (`make`, `just`, `tox`, or `nox`) for standard commands.
+- No pre-commit hook baseline to enforce local consistency before push.
+- README contains conflicting auth statements and should be normalized.
+
+## Testing and Validation Gaps
+- Missing direct tests for API auth enforcement behavior under `admin_auth_enabled`.
+- Missing CSRF tests (expected to fail until CSRF is implemented).
+- Missing focused tests for `backend/app/search_cache.py` branch behavior and eviction.
+- Missing host-header/absolute URL generation tests.
+- Missing regression tests for config save behavior vs runtime constants.
+- Missing integration tests for docker entrypoints and environment-driven config patching.
+
+## Required Workflow for Future Agents
+1. Read `CHANGELOG.md`, `README.md`, and this file before edits.
+2. For any auth/routing change, inspect:
+   - `backend/app/main.py`
+   - `backend/app/admin/__init__.py`
+   - `backend/app/admin/auth.py`
+   - `backend/app/api/__init__.py`
+3. If config keys or semantics change, update:
+   - `config-template.txt`
+   - `README.md`
+   - `test/conftest.py`
+4. If release behavior changes, update:
+   - `backend/app/__init__.py` version
+   - `CHANGELOG.md`
+   - `go-server.spec` packaging notes if relevant
+5. Always rerun:
+   - `.\.venv\Scripts\python.exe -m coverage run -m pytest`
+   - `.\.venv\Scripts\python.exe -m coverage report --fail-under=90`
+   - `.\.venv\Scripts\ruff.exe check .`
+   - `.\.venv\Scripts\ruff.exe format --check .`
+   - `.\.venv\Scripts\bandit.exe -r backend app.py init_db.py`
+   - `.\.venv\Scripts\pip-audit.exe --strict`
+
+## Immediate Remediation Queue
+1. [Done] Enforce API authentication parity with admin auth (P0).
+2. [Done] Add CSRF protection to all state-changing browser forms (P0).
+3. [Done] Replace bootstrap-first-login with controlled bootstrap token/flow (P1).
+4. [Done] Restrict allowed redirect URL schemes and validate admin URL input (P1).
+5. [Open] Refactor `backend/app/api/__init__.py` into smaller modules and add targeted tests.
+6. [Open] Add dedicated `search_cache` unit tests and close uncovered lines.

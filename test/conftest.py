@@ -16,6 +16,7 @@ def prepare_test_config(monkeypatch, tmp_path):
         "allow-files": True,
         "fallback-url": "https://search.example/?q={q}",
         "file-allow": [str(tmp_path)],
+        "secret-key": "test-secret-key",
         "log-level": "DEBUG",
         "log-file": str(tmp_path / "go-search-engine.log"),
     }
@@ -93,7 +94,11 @@ def app_ctx(test_config):
 @pytest.fixture()
 def client(app_ctx):
     """Flask test client with isolated database."""
-    return app_ctx.test_client()
+    test_client = app_ctx.test_client()
+    with test_client.session_transaction() as sess:
+        sess["_csrf_token"] = "test-csrf-token"
+    test_client.environ_base["HTTP_X_CSRF_TOKEN"] = "test-csrf-token"
+    return test_client
 
 
 @pytest.fixture()

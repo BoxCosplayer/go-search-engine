@@ -33,6 +33,7 @@ ensure_config_file() {
   "fallback-url": "",
   "file-allow": [],
   "admin-auth-enabled": false,
+  "secret-key": "",
   "log-level": "INFO",
   "log-file": "/data/go-search-engine.log"
 }

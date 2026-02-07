@@ -147,6 +147,25 @@ def test_get_log_level_defaults_to_info(monkeypatch):
     assert utils.get_log_level() == "INFO"
 
 
+def test_get_secret_key_env_override(monkeypatch):
+    monkeypatch.setenv("GO_SECRET_KEY", "env-secret")
+    assert utils.get_secret_key() == "env-secret"
+
+
+def test_get_secret_key_from_config(monkeypatch):
+    monkeypatch.delenv("GO_SECRET_KEY", raising=False)
+    cfg = utils.GoConfig(secret_key="cfg-secret")
+    monkeypatch.setattr(utils, "config", cfg, raising=False)
+    assert utils.get_secret_key() == "cfg-secret"
+
+
+def test_is_supported_redirect_url():
+    assert utils.is_supported_redirect_url("https://example.com")
+    assert utils.is_supported_redirect_url("http://example.com")
+    assert utils.is_supported_redirect_url("file:///tmp/demo.txt")
+    assert not utils.is_supported_redirect_url("mailto:test@example.com")
+
+
 def test_sanitize_query_normalizes_quotes_and_trailing_chars():
     assert utils.sanitize_query('"Hello?! "') == "Hello"
     assert utils.sanitize_query("' spaced '") == "spaced"
@@ -295,7 +314,11 @@ def test_ensure_config_file_falls_back_to_defaults(monkeypatch, tmp_path, fake_d
     monkeypatch.setattr(utils, "runtime_base_dir", lambda: tmp_path)
     monkeypatch.setattr(utils, "_project_root", lambda: tmp_path)
     created = utils._ensure_config_file_exists()
-    assert json.loads(created.read_text(encoding="utf-8")) == utils._DEFAULT_CONFIG
+    data = json.loads(created.read_text(encoding="utf-8"))
+    expected = dict(utils._DEFAULT_CONFIG)
+    expected["secret-key"] = data["secret-key"]
+    assert data == expected
+    assert data["secret-key"].strip() != ""
 
 
 def test_ensure_config_file_strips_custom_db_path(monkeypatch, tmp_path, fake_db_default):
@@ -325,7 +348,10 @@ def test_ensure_config_file_handles_non_object_template(monkeypatch, tmp_path, f
     monkeypatch.setattr(utils, "_discover_config_path", lambda: cfg)
     created = utils._ensure_config_file_exists()
     data = json.loads(created.read_text(encoding="utf-8"))
-    assert data == utils._DEFAULT_CONFIG
+    expected = dict(utils._DEFAULT_CONFIG)
+    expected["secret-key"] = data["secret-key"]
+    assert data == expected
+    assert data["secret-key"].strip() != ""
 
 
 def test_discover_config_path_honors_env(monkeypatch, tmp_path):
@@ -435,6 +461,7 @@ def test_load_config_missing_file_creates_default(tmp_path, monkeypatch, fake_db
     assert created.exists()
     data = json.loads(created.read_text(encoding="utf-8"))
     assert "db-path" not in data
+    assert (data.get("secret-key") or "").strip() != ""
 
 
 def test_ensure_config_file_handles_invalid_template(tmp_path, monkeypatch):
@@ -548,3 +575,28 @@ def test_load_config_wraps_validation_error(monkeypatch, tmp_path):
     with pytest.raises(ValueError) as exc:
         utils.load_config()
     assert "Invalid configuration" in str(exc.value)
+
+
+def test_load_config_generates_and_persists_secret_key_when_missing(monkeypatch, tmp_path):
+    cfg = tmp_path / "config.json"
+    cfg.write_text(
+        json.dumps(
+            {
+                "host": "127.0.0.1",
+                "port": 5000,
+                "debug": False,
+                "allow-files": False,
+                "fallback-url": "",
+                "file-allow": [],
+                "admin-auth-enabled": False,
+                "secret-key": "",
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.delenv("GO_SECRET_KEY", raising=False)
+    monkeypatch.setattr(utils, "_discover_config_path", lambda: cfg)
+    loaded = utils.load_config()
+    assert loaded.secret_key.strip() != ""
+    persisted = json.loads(cfg.read_text(encoding="utf-8"))
+    assert persisted["secret-key"] == loaded.secret_key

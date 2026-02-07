@@ -231,6 +231,7 @@
 
     <div class="card">
       <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <label for="host">Host
           <input id="host" name="host" type="text" value="{{ form.host }}" required>
         </label>
@@ -285,6 +286,12 @@
           <input id="fallback_url" name="fallback_url" type="text" value="{{ form.fallback_url }}"
             placeholder="https://duckduckgo.com/?q={q}">
           <span>Optional template used when no shortcuts match. Use <code>{q}</code> for the encoded query.</span>
+        </label>
+
+        <label for="secret_key">Session secret key
+          <input id="secret_key" name="secret_key" type="text" value="{{ form.secret_key }}"
+            placeholder="Auto-generated on first run when empty">
+          <span>Used to sign sessions and CSRF tokens. Keep this stable and private.</span>
         </label>
 
         <label for="file_allow">Allowed file roots

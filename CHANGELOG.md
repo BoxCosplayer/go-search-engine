@@ -2,6 +2,20 @@
 
 ## [Major Versions Log](#major-versions-log)
 
+
+## 1.4.0 - 07/02/2026
+
+- Removed the `/admin/bootstrap` flow and bootstrap token configuration.
+- Enforced API authentication parity with admin authentication when `admin-auth-enabled` is true.
+- Replaced implicit first-login admin creation with explicit `/admin/bootstrap` flow protected by a bootstrap token.
+- Added CSRF protection for state-changing browser routes (`/admin/*` and `/import/shortcuts`) using per-session tokens.
+- Restricted redirect targets to `http://`, `https://`, and `file://` schemes; unsupported schemes now fail closed.
+- Added `admin-bootstrap-token` and `secret-key` configuration support (`GO_ADMIN_BOOTSTRAP_TOKEN` and `GO_SECRET_KEY` overrides).
+- Auto-generates and persists a per-install `secret-key` on first run when missing.
+- Exposed `secret-key` editing in the Admin config UI.
+- Updated templates, docs, and tests to cover bootstrap/auth/CSRF and scheme validation behavior.
+
+
 ## 1.3.5 - 04/02/2026
 
 - Batched list and link mutations to reduce SQLite write contention.
@@ -235,6 +249,7 @@
 
 # Major Versions Log
 
+- 1.4 - DX and misc. security updates
 - 1.3 - Speed Improvements
 - 1.2 - Security Improvements
 - 1.1 - Publication & QoL updates

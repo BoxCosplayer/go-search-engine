@@ -87,6 +87,12 @@ def test_export_shortcuts_csv(client, db_conn):
 
 def test_export_shortcuts_requires_admin_auth(client, db_conn, test_config):
     test_config.admin_auth_enabled = True
+    ensure_admin_users_schema(db_conn)
+    db_conn.execute(
+        "INSERT INTO admin_users(username, password_hash, is_active) VALUES (?, ?, 1)",
+        ("admin", generate_password_hash("secret")),
+    )
+    db_conn.commit()
     add_link(db_conn, "gh", "https://github.com", "GitHub", search_enabled=True)
 
     rv = client.get("/export/shortcuts.csv")
@@ -128,6 +134,14 @@ def test_import_shortcuts_redirects_on_post_without_auth(client, db_conn, test_c
     rv = client.post("/import/shortcuts", data={})
     assert rv.status_code == 302
     assert rv.headers["Location"].endswith("/")
+
+
+def test_import_shortcuts_rejects_missing_csrf(app_ctx):
+    raw_client = app_ctx.test_client()
+    rv = raw_client.post(
+        "/import/shortcuts", data={"file": (BytesIO(b"keyword,url\nx,https://x"), "shortcuts.csv")}
+    )
+    assert rv.status_code == 400
 
 
 def test_import_shortcuts_csv(client, db_conn):
@@ -807,4 +821,4 @@ def test_go_file_path_checks(client, db_conn, monkeypatch, tmp_path):
 def test_go_exact_redirect_other_scheme(client, db_conn):
     add_link(db_conn, "mailto", "mailto:test@example.com", "Email")
     rv = client.get("/go", query_string={"q": "mailto"})
-    assert rv.status_code == 302
+    assert rv.status_code == 400
