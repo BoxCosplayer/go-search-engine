@@ -6,6 +6,7 @@ from backend.app.db import (
     ensure_admin_users_schema,
     ensure_links_schema,
     ensure_lists_schema,
+    ensure_opensearch_columns,
     ensure_search_flag_column,
     ensure_seed_links,
     get_db,
@@ -40,6 +41,8 @@ def test_init_db_creates_links_table(app_ctx):
     assert row["name"] == "links"
     cols = {info["name"] for info in conn.execute("PRAGMA table_info(links)").fetchall()}
     assert "search_enabled" in cols
+    assert "opensearch_doc_url" in cols
+    assert "opensearch_template" in cols
     close_db(None)
 
 
@@ -96,8 +99,11 @@ def test_ensure_search_flag_column_adds_missing_column(tmp_path):
     )
     conn.commit()
     ensure_search_flag_column(conn)
+    ensure_opensearch_columns(conn)
     columns = {row[1] for row in conn.execute("PRAGMA table_info(links)")}
     assert "search_enabled" in columns
+    assert "opensearch_doc_url" in columns
+    assert "opensearch_template" in columns
     conn.close()
 
 

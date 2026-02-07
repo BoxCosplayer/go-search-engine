@@ -2,6 +2,12 @@
 
 ## [Major Versions Log](#major-versions-log)
 
+## 1.3.4 - 04/02/2026
+
+- OpenSearch discovery now runs after link writes, stores templates, and auto-enables search when valid.
+- Bang searches now use stored OpenSearch templates to avoid per-request network discovery.
+- Hardened OpenSearch discovery fetches against SSRF by blocking localhost/private targets and unsafe redirects.
+
 ## 1.3.3 - 03/02/2026
 
 - Switched the local/EXE server to Waitress for better concurrency.
