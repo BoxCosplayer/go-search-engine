@@ -40,7 +40,7 @@ from .api import (
     opensearch_description,
     opensearch_suggest,
 )
-from .db import DB_PATH, ensure_lists_schema, ensure_search_flag_column, get_db
+from .db import DB_PATH, ensure_search_flag_column, get_db
 from .db import init_app as db_init_app
 from .lists import lists_bp
 from .logging_setup import configure_logging
@@ -545,7 +545,7 @@ def _handle_bang_query(db, query: str):
     if not keyword:  # pragma: no cover - defensive guard
         return None
     row = db.execute(
-        "SELECT url, search_enabled FROM links WHERE lower(keyword)=lower(?)",
+        "SELECT url, search_enabled FROM links WHERE keyword COLLATE NOCASE = ?",
         (keyword,),
     ).fetchone()
     if not row:
@@ -569,7 +569,6 @@ def index():
     if query:
         return redirect(url_for("go", q=query), code=302)
     db = get_db()
-    ensure_lists_schema(db)
     rows = _select_links_with_lists(db)
     return render_template("index.html", rows=rows)
 
@@ -603,7 +602,10 @@ def go():
             404,
         )
 
-    exact = db.execute("SELECT url FROM links WHERE lower(keyword) = lower(?)", (q,)).fetchone()
+    exact = db.execute(
+        "SELECT url FROM links WHERE keyword COLLATE NOCASE = ?",
+        (q,),
+    ).fetchone()
 
     if exact:
         return _redirect_to_url(exact["url"])
@@ -632,7 +634,7 @@ if __name__ == "__main__":  # pragma: no cover
         db.execute("""
         CREATE TABLE IF NOT EXISTS links (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
-          keyword TEXT NOT NULL UNIQUE,
+          keyword TEXT NOT NULL UNIQUE COLLATE NOCASE,
           url TEXT NOT NULL,
           title TEXT,
           search_enabled INTEGER NOT NULL DEFAULT 0
