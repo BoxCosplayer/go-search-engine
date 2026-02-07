@@ -521,6 +521,64 @@ def test_http_get_fallback(monkeypatch):
     assert resp.content == b"ok"
 
 
+def test_is_safe_remote_url_blocks_localhost_and_private_ip():
+    assert opensearch._is_safe_remote_url("http://localhost/opensearch.xml") is False
+    assert opensearch._is_safe_remote_url("https://127.0.0.1/opensearch.xml") is False
+    assert opensearch._is_safe_remote_url("https://192.168.1.15/opensearch.xml") is False
+    assert opensearch._is_safe_remote_url("http://[::1]/opensearch.xml") is False
+
+
+def test_is_safe_remote_url_blocks_private_dns_resolution(monkeypatch):
+    opensearch._hostname_resolves_public.cache_clear()
+
+    monkeypatch.setattr(
+        opensearch.socket,
+        "getaddrinfo",
+        lambda *a, **k: [
+            (
+                opensearch.socket.AF_INET,
+                opensearch.socket.SOCK_STREAM,
+                6,
+                "",
+                ("10.0.0.8", 443),
+            )
+        ],
+    )
+    assert opensearch._is_safe_remote_url("https://internal.example/opensearch.xml") is False
+    opensearch._hostname_resolves_public.cache_clear()
+
+
+def test_http_get_rejects_unsafe_target_before_request(monkeypatch):
+    called = {"network_called": False}
+
+    def fake_get(_url):
+        called["network_called"] = True
+        return SimpleNamespace(status_code=200, content=b"ok", encoding="utf-8", headers={})
+
+    monkeypatch.setattr(opensearch, "_HTTP_CLIENT", SimpleNamespace(get=fake_get))
+    assert opensearch._http_get("http://127.0.0.1/secret") is None
+    assert called["network_called"] is False
+
+
+def test_http_get_blocks_redirect_to_private_target(monkeypatch):
+    calls = []
+
+    class RedirectResp:
+        status_code = 302
+        headers = {"Location": "http://127.0.0.1/admin"}
+
+    def fake_get(url, follow_redirects=False):
+        calls.append(url)
+        return RedirectResp()
+
+    monkeypatch.setattr(opensearch, "_HTTP_CLIENT", SimpleNamespace(get=fake_get))
+    monkeypatch.setattr(opensearch, "curl_requests", None)
+    monkeypatch.setattr(opensearch, "tls_client", None, raising=False)
+
+    assert opensearch._http_get("https://example.com/start") is None
+    assert calls == ["https://example.com/start"]
+
+
 def test_http_get_no_fallback(monkeypatch):
     class BadResp:
         status_code = 403
