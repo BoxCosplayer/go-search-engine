@@ -23,18 +23,18 @@ def admin_list_add():
         slug = to_slug(name)
     if not name:
         name = slug.replace("-", " ").title()
-    try:
-        db.execute("INSERT INTO lists(slug, name, description) VALUES (?, ?, ?)", (slug, name, desc))
-        db.commit()
-    except sqlite3.IntegrityError:
-        return admin_error(f"List '{slug}' already exists", 400)
-
     base_url = request.host_url.rstrip("/")
     list_url = f"{base_url}/lists/{slug}"
     title = f"List - {name}"
-
-    db.execute("INSERT OR IGNORE INTO links(keyword, url, title) VALUES (?, ?, ?)", (slug, list_url, title))
-    db.commit()
+    try:
+        with db:
+            db.execute("INSERT INTO lists(slug, name, description) VALUES (?, ?, ?)", (slug, name, desc))
+            db.execute(
+                "INSERT OR IGNORE INTO links(keyword, url, title) VALUES (?, ?, ?)",
+                (slug, list_url, title),
+            )
+    except sqlite3.IntegrityError:
+        return admin_error(f"List '{slug}' already exists", 400)
     invalidate_suggestions_cache()
 
     return redirect("/admin")
@@ -59,19 +59,18 @@ def admin_set_lists():
     slugs = sorted(set(slugs))
 
     new_lists = []
-    for slug in slugs:
-        row = db.execute(
-            "SELECT id FROM lists WHERE slug COLLATE NOCASE = ?",
-            (slug,),
-        ).fetchone()
-        if not row:
-            name = slug.replace("-", " ").title()
-            db.execute("INSERT INTO lists(slug, name) VALUES (?, ?)", (slug, name))
-            new_lists.append((slug, name))
-    db.commit()
+    base_url = request.host_url.rstrip("/")
+    with db:
+        for slug in slugs:
+            row = db.execute(
+                "SELECT id FROM lists WHERE slug COLLATE NOCASE = ?",
+                (slug,),
+            ).fetchone()
+            if not row:
+                name = slug.replace("-", " ").title()
+                db.execute("INSERT INTO lists(slug, name) VALUES (?, ?)", (slug, name))
+                new_lists.append((slug, name))
 
-    if new_lists:
-        base_url = request.host_url.rstrip("/")
         for slug_value, name in new_lists:
             list_url = f"{base_url}/lists/{slug_value}"
             title = f"List - {name}"
@@ -79,16 +78,15 @@ def admin_set_lists():
                 db.execute(
                     "INSERT INTO links(keyword, url, title) VALUES (?, ?, ?)", (slug_value, list_url, title)
                 )
-        db.commit()
 
-    db.execute("DELETE FROM link_lists WHERE link_id=?", (link_id,))
-    for slug in slugs:
-        list_id = db.execute(
-            "SELECT id FROM lists WHERE slug COLLATE NOCASE = ?",
-            (slug,),
-        ).fetchone()["id"]
-        db.execute("INSERT OR IGNORE INTO link_lists(link_id, list_id) VALUES (?, ?)", (link_id, list_id))
-    db.commit()
+        db.execute("DELETE FROM link_lists WHERE link_id=?", (link_id,))
+        for slug in slugs:
+            list_id = db.execute(
+                "SELECT id FROM lists WHERE slug COLLATE NOCASE = ?",
+                (slug,),
+            ).fetchone()["id"]
+            db.execute("INSERT OR IGNORE INTO link_lists(link_id, list_id) VALUES (?, ?)", (link_id, list_id))
+
     if new_lists:
         invalidate_suggestions_cache()
     return redirect("/admin")
@@ -107,8 +105,8 @@ def admin_list_delete():
     ).fetchone()
     if not row:
         return admin_error("list not found", 404)
-    db.execute("DELETE FROM lists WHERE id=?", (row["id"],))
-    db.execute("DELETE FROM links WHERE keyword COLLATE NOCASE = ?", (row["slug"],))
-    db.commit()
+    with db:
+        db.execute("DELETE FROM lists WHERE id=?", (row["id"],))
+        db.execute("DELETE FROM links WHERE keyword COLLATE NOCASE = ?", (row["slug"],))
     invalidate_suggestions_cache()
     return redirect("/lists")

@@ -15,21 +15,28 @@ def admin_add():
     keyword = (request.form.get("keyword") or "").strip()
     title = (request.form.get("title") or "").strip() or None
     url = (request.form.get("url") or "").strip()
-    search_enabled = 0
-
     if not keyword or not url:
         return admin_error("Keyword and URL required", 400)
     if any(ch.isspace() for ch in keyword):
         return admin_error("Keyword cannot contain whitespace", 400)
 
+    search_enabled = 0
+    opensearch_doc_url = None
+    opensearch_template = None
+    discovered = opensearch.discover_opensearch_template(url)
+    if discovered:
+        opensearch_doc_url, opensearch_template = discovered
+        search_enabled = 1
+
     db = get_db()
     try:
-        cur = db.execute(
-            "INSERT INTO links(keyword, url, title, search_enabled) VALUES (?, ?, ?, ?)",
-            (keyword, url, title, search_enabled),
+        db.execute(
+            """
+            INSERT INTO links(keyword, url, title, search_enabled, opensearch_doc_url, opensearch_template)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (keyword, url, title, search_enabled, opensearch_doc_url, opensearch_template),
         )
-        db.commit()
-        opensearch.refresh_link_opensearch(db, cur.lastrowid, url)
         db.commit()
         invalidate_suggestions_cache()
     except Exception:
@@ -57,12 +64,18 @@ def admin_update():
     keyword = (request.form.get("keyword") or "").strip()
     url = (request.form.get("url") or "").strip()
     title = (request.form.get("title") or "").strip() or None
-    search_enabled = 0
-
     if not original or not keyword or not url:
         return admin_error("original_keyword, keyword and url are required", 400)
     if any(ch.isspace() for ch in keyword):
         return admin_error("Keyword cannot contain whitespace", 400)
+
+    search_enabled = 0
+    opensearch_doc_url = None
+    opensearch_template = None
+    discovered = opensearch.discover_opensearch_template(url)
+    if discovered:
+        opensearch_doc_url, opensearch_template = discovered
+        search_enabled = 1
 
     db = get_db()
     row = db.execute(
@@ -74,11 +87,13 @@ def admin_update():
 
     try:
         db.execute(
-            "UPDATE links SET keyword=?, url=?, title=?, search_enabled=? WHERE id=?",
-            (keyword, url, title, search_enabled, row["id"]),
+            """
+            UPDATE links
+            SET keyword=?, url=?, title=?, search_enabled=?, opensearch_doc_url=?, opensearch_template=?
+            WHERE id=?
+            """,
+            (keyword, url, title, search_enabled, opensearch_doc_url, opensearch_template, row["id"]),
         )
-        db.commit()
-        opensearch.refresh_link_opensearch(db, row["id"], url)
         db.commit()
         invalidate_suggestions_cache()
     except sqlite3.IntegrityError:

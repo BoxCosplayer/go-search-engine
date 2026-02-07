@@ -229,82 +229,100 @@ def _import_shortcuts_from_csv(db, file_storage):
 
     inserted = 0
     updated = 0
-    pending_discovery: list[tuple[int, str]] = []
-    for row in reader:
-        keyword = (row.get("keyword") or "").strip()
-        url = (row.get("url") or "").strip()
-        if not keyword or not url:
-            continue
-        title = (row.get("title") or "").strip()
-        search_enabled = 0
+    pending_discovery: dict[int, str] = {}
+    with db:
+        for row in reader:
+            keyword = (row.get("keyword") or "").strip()
+            url = (row.get("url") or "").strip()
+            if not keyword or not url:
+                continue
+            title = (row.get("title") or "").strip()
+            search_enabled = 0
 
-        existing_keyword = db.execute(
-            "SELECT id FROM links WHERE keyword COLLATE NOCASE = ?",
-            (keyword,),
-        ).fetchone()
-        existing_url = db.execute(
-            "SELECT id FROM links WHERE url COLLATE NOCASE = ?",
-            (url,),
-        ).fetchone()
-
-        if existing_keyword:
-            link_id = existing_keyword["id"]
-            db.execute(
-                "UPDATE links SET keyword=?, url=?, title=?, search_enabled=? WHERE id=?",
-                (keyword, url, title or None, search_enabled, link_id),
-            )
-            updated += 1
-        elif existing_url:
-            link_id = existing_url["id"]
-            db.execute(
-                "UPDATE links SET keyword=?, url=?, title=?, search_enabled=? WHERE id=?",
-                (keyword, url, title or None, search_enabled, link_id),
-            )
-            updated += 1
-        else:
-            cur = db.execute(
-                "INSERT INTO links(keyword, url, title, search_enabled) VALUES (?, ?, ?, ?)",
-                (keyword, url, title or None, search_enabled),
-            )
-            link_id = cur.lastrowid
-            inserted += 1
-        pending_discovery.append((link_id, url))
-
-        duplicates = db.execute(
-            "SELECT id FROM links WHERE url COLLATE NOCASE = ? AND id <> ?",
-            (url, link_id),
-        ).fetchall()
-        for duplicate in duplicates:
-            _delete_link(db, duplicate["id"])
-
-        lists_field = row.get("lists") or ""
-        slugs = [slug.strip() for slug in lists_field.split(",") if slug.strip()]
-        list_ids: list[int] = []
-        for slug in slugs:
-            list_row = db.execute(
-                "SELECT id FROM lists WHERE slug COLLATE NOCASE = ?",
-                (slug,),
+            existing_keyword = db.execute(
+                "SELECT id FROM links WHERE keyword COLLATE NOCASE = ?",
+                (keyword,),
             ).fetchone()
-            if list_row:
-                list_id = list_row["id"]
-            else:
-                list_cursor = db.execute(
-                    "INSERT INTO lists(slug, name) VALUES (?, ?)",
-                    (slug, slug),
-                )
-                list_id = list_cursor.lastrowid
-            list_ids.append(list_id)
+            existing_url = db.execute(
+                "SELECT id FROM links WHERE url COLLATE NOCASE = ?",
+                (url,),
+            ).fetchone()
 
-        db.execute("DELETE FROM link_lists WHERE link_id=?", (link_id,))
-        for list_id in list_ids:
-            db.execute(
-                "INSERT INTO link_lists(link_id, list_id) VALUES (?, ?)",
-                (link_id, list_id),
+            if existing_keyword:
+                link_id = existing_keyword["id"]
+                db.execute(
+                    "UPDATE links SET keyword=?, url=?, title=?, search_enabled=? WHERE id=?",
+                    (keyword, url, title or None, search_enabled, link_id),
+                )
+                updated += 1
+            elif existing_url:
+                link_id = existing_url["id"]
+                db.execute(
+                    "UPDATE links SET keyword=?, url=?, title=?, search_enabled=? WHERE id=?",
+                    (keyword, url, title or None, search_enabled, link_id),
+                )
+                updated += 1
+            else:
+                cur = db.execute(
+                    "INSERT INTO links(keyword, url, title, search_enabled) VALUES (?, ?, ?, ?)",
+                    (keyword, url, title or None, search_enabled),
+                )
+                link_id = cur.lastrowid
+                inserted += 1
+            pending_discovery[link_id] = url
+
+            duplicates = db.execute(
+                "SELECT id FROM links WHERE url COLLATE NOCASE = ? AND id <> ?",
+                (url, link_id),
+            ).fetchall()
+            for duplicate in duplicates:
+                _delete_link(db, duplicate["id"])
+
+            lists_field = row.get("lists") or ""
+            slugs = [slug.strip() for slug in lists_field.split(",") if slug.strip()]
+            list_ids: list[int] = []
+            for slug in slugs:
+                list_row = db.execute(
+                    "SELECT id FROM lists WHERE slug COLLATE NOCASE = ?",
+                    (slug,),
+                ).fetchone()
+                if list_row:
+                    list_id = list_row["id"]
+                else:
+                    list_cursor = db.execute(
+                        "INSERT INTO lists(slug, name) VALUES (?, ?)",
+                        (slug, slug),
+                    )
+                    list_id = list_cursor.lastrowid
+                list_ids.append(list_id)
+
+            db.execute("DELETE FROM link_lists WHERE link_id=?", (link_id,))
+            for list_id in list_ids:
+                db.execute(
+                    "INSERT INTO link_lists(link_id, list_id) VALUES (?, ?)",
+                    (link_id, list_id),
+                )
+
+    updates: list[tuple[str | None, str | None, int, int]] = []
+    for link_id, link_url in pending_discovery.items():
+        discovered = opensearch.discover_opensearch_template(link_url)
+        if discovered:
+            doc_url, template = discovered
+            updates.append((doc_url, template, 1, link_id))
+        else:
+            updates.append((None, None, 0, link_id))
+
+    if updates:
+        with db:
+            db.executemany(
+                """
+                UPDATE links
+                SET opensearch_doc_url=?, opensearch_template=?, search_enabled=?
+                WHERE id=?
+                """,
+                updates,
             )
 
-    db.commit()
-    for link_id, link_url in pending_discovery:
-        opensearch.refresh_link_opensearch(db, link_id, link_url)
     return inserted + updated
 
 
@@ -330,7 +348,9 @@ def links():
         keyword = (data.get("keyword") or "").strip()
         url = (data.get("url") or "").strip()
         title = (data.get("title") or "").strip() or None
-        search_enabled = False
+        search_enabled = 0
+        opensearch_doc_url = None
+        opensearch_template = None
 
         if not keyword or not url:
             abort(400, "keyword and url are required")
@@ -338,13 +358,18 @@ def links():
             abort(400, "keyword cannot contain whitespace")
         if not (url.startswith("http://") or url.startswith("https://")):
             abort(400, "url must start with http:// or https://")
+        discovered = opensearch.discover_opensearch_template(url)
+        if discovered:
+            opensearch_doc_url, opensearch_template = discovered
+            search_enabled = True
         try:
-            cur = db.execute(
-                "INSERT INTO links(keyword, url, title, search_enabled) VALUES (?, ?, ?, ?)",
-                (keyword, url, title, int(search_enabled)),
+            db.execute(
+                """
+                INSERT INTO links(keyword, url, title, search_enabled, opensearch_doc_url, opensearch_template)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (keyword, url, title, int(search_enabled), opensearch_doc_url, opensearch_template),
             )
-            db.commit()
-            opensearch.refresh_link_opensearch(db, cur.lastrowid, url)
             db.commit()
             invalidate_suggestions_cache()
         except sqlite3.IntegrityError:
@@ -386,6 +411,8 @@ def update_link(keyword: str):
     new_url = (data.get("url") or row["url"]).strip()
     new_title = (data.get("title") or row["title"] or "").strip() or None
     new_search_enabled = False
+    opensearch_doc_url = None
+    opensearch_template = None
 
     if not new_keyword or not new_url:
         abort(400, "keyword and url are required")  # pragma: no cover
@@ -393,16 +420,28 @@ def update_link(keyword: str):
         abort(400, "keyword cannot contain whitespace")
     if not (new_url.startswith("http://") or new_url.startswith("https://")):
         abort(400, "url must start with http:// or https://")
+    discovered = opensearch.discover_opensearch_template(new_url)
+    if discovered:
+        opensearch_doc_url, opensearch_template = discovered
+        new_search_enabled = True
 
     try:
         db.execute(
-            "UPDATE links SET keyword=?, url=?, title=?, search_enabled=? WHERE id=?",
-            (new_keyword, new_url, new_title, int(new_search_enabled), row["id"]),
+            """
+            UPDATE links
+            SET keyword=?, url=?, title=?, search_enabled=?, opensearch_doc_url=?, opensearch_template=?
+            WHERE id=?
+            """,
+            (
+                new_keyword,
+                new_url,
+                new_title,
+                int(new_search_enabled),
+                opensearch_doc_url,
+                opensearch_template,
+                row["id"],
+            ),
         )
-        db.commit()
-        refreshed = opensearch.refresh_link_opensearch(db, row["id"], new_url)
-        if refreshed:
-            new_search_enabled = True
         db.commit()
         invalidate_suggestions_cache()
     except sqlite3.IntegrityError:
@@ -429,8 +468,8 @@ def delete_link(keyword: str):
     ).fetchone()
     if not row:
         abort(404, "link not found")
-    db.execute("DELETE FROM links WHERE id=?", (row["id"],))
-    db.commit()
+    with db:
+        db.execute("DELETE FROM links WHERE id=?", (row["id"],))
     invalidate_suggestions_cache()
     return {"ok": True}
 
@@ -466,19 +505,18 @@ def lists():
             slug = to_slug(name)
         if not name:
             name = slug.replace("-", " ").title()
-        try:
-            db.execute("INSERT INTO lists(slug,name,description) VALUES (?,?,?)", (slug, name, desc))
-            db.commit()
-        except sqlite3.IntegrityError:
-            abort(400, "slug exists")
-
-        # Create a link to the list
         base_url = request.host_url.rstrip("/")
         list_url = f"{base_url}/lists/{slug}"
         title = f"List - {name}"
-
-        db.execute("INSERT OR IGNORE INTO links(keyword, url, title) VALUES (?, ?, ?)", (slug, list_url, title))
-        db.commit()
+        try:
+            with db:
+                db.execute("INSERT INTO lists(slug,name,description) VALUES (?,?,?)", (slug, name, desc))
+                db.execute(
+                    "INSERT OR IGNORE INTO links(keyword, url, title) VALUES (?, ?, ?)",
+                    (slug, list_url, title),
+                )
+        except sqlite3.IntegrityError:
+            abort(400, "slug exists")
         invalidate_suggestions_cache()
 
         return {"ok": True}
@@ -530,24 +568,23 @@ def list_detail(slug: str):
         if not new_name:
             new_name = new_slug.replace("-", " ").title()  # pragma: no cover
         try:
-            db.execute(
-                "UPDATE lists SET slug=?, name=?, description=? WHERE id=?",
-                (new_slug, new_name, new_desc, info["id"]),
-            )
-            db.commit()
+            with db:
+                db.execute(
+                    "UPDATE lists SET slug=?, name=?, description=? WHERE id=?",
+                    (new_slug, new_name, new_desc, info["id"]),
+                )
+
+                # Update the auto-created shortcut link if it exists (best effort).
+                with suppress(Exception):
+                    base_url = request.host_url.rstrip("/")
+                    list_url = f"{base_url}/lists/{new_slug}"
+                    title = f"List - {new_name}"
+                    db.execute(
+                        "UPDATE links SET keyword=?, url=?, title=? WHERE keyword COLLATE NOCASE = ?",
+                        (new_slug, list_url, title, slug),
+                    )
         except sqlite3.IntegrityError:
             return {"error": f"slug '{escape(new_slug)}' already exists"}, 400
-
-        # Update the auto-created shortcut link if it exists (best effort).
-        with suppress(Exception):
-            base_url = request.host_url.rstrip("/")
-            list_url = f"{base_url}/lists/{new_slug}"
-            title = f"List - {new_name}"
-            db.execute(
-                "UPDATE links SET keyword=?, url=?, title=? WHERE keyword COLLATE NOCASE = ?",
-                (new_slug, list_url, title, slug),
-            )
-            db.commit()
         invalidate_suggestions_cache()
 
         return {
@@ -562,10 +599,10 @@ def list_detail(slug: str):
     # DELETE branch
     if not info:
         abort(404, "list not found")  # pragma: no cover
-    db.execute("DELETE FROM lists WHERE id=?", (info["id"],))
-    with suppress(Exception):
-        db.execute("DELETE FROM links WHERE keyword COLLATE NOCASE = ?", (slug,))
-    db.commit()
+    with db:
+        db.execute("DELETE FROM lists WHERE id=?", (info["id"],))
+        with suppress(Exception):
+            db.execute("DELETE FROM links WHERE keyword COLLATE NOCASE = ?", (slug,))
     invalidate_suggestions_cache()
     return {"ok": True}
 
@@ -604,11 +641,11 @@ def list_links(slug: str):
     ).fetchone()
     if not link:
         abort(404, "link not found")
-    db.execute(
-        "INSERT OR IGNORE INTO link_lists(link_id, list_id) VALUES (?, ?)",
-        (link["id"], info["id"]),
-    )
-    db.commit()
+    with db:
+        db.execute(
+            "INSERT OR IGNORE INTO link_lists(link_id, list_id) VALUES (?, ?)",
+            (link["id"], info["id"]),
+        )
     return {"ok": True}
 
 
@@ -628,11 +665,11 @@ def remove_list_link(slug: str, keyword: str):
     ).fetchone()
     if not link:
         abort(404, "link not found")
-    db.execute(
-        "DELETE FROM link_lists WHERE link_id=? AND list_id=?",
-        (link["id"], info["id"]),
-    )
-    db.commit()
+    with db:
+        db.execute(
+            "DELETE FROM link_lists WHERE link_id=? AND list_id=?",
+            (link["id"], info["id"]),
+        )
     return {"ok": True}
 
 
@@ -687,7 +724,6 @@ def import_shortcuts_csv():
 
     db = get_db()
     _import_shortcuts_from_csv(db, uploaded)
-    db.commit()
     invalidate_suggestions_cache()
     return redirect(url_for("index"))
 

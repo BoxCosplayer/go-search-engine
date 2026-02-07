@@ -2,6 +2,11 @@
 
 ## [Major Versions Log](#major-versions-log)
 
+## 1.3.5 - 04/02/2026
+
+- Batched list and link mutations to reduce SQLite write contention.
+- Moved OpenSearch discovery out of CSV import transactions and apply results in a single update pass.
+
 ## 1.3.4 - 04/02/2026
 
 - OpenSearch discovery now runs after link writes, stores templates, and auto-enables search when valid.
@@ -27,6 +32,7 @@
 - Initialize schema/indexes at app startup to avoid per-request DDL.
 - Added SQLite performance pragmas (WAL, cache, busy timeout, temp store).
 - Added case-insensitive indexes and lookups for links/lists/admin users.
+
 
 ## 1.2.3 - 28/01/2026
 
