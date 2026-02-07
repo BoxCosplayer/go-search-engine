@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import ipaddress
 import logging
 import re
+import socket
 from functools import lru_cache
 from html.parser import HTMLParser
 from urllib.parse import quote_plus, urljoin, urlparse
@@ -45,8 +47,93 @@ _HTTP_CLIENT = httpx.Client(
     http2=False,
     headers=DEFAULT_HTTP_HEADERS,
     timeout=httpx.Timeout(OPENSEARCH_TIMEOUT, connect=OPENSEARCH_TIMEOUT),
-    follow_redirects=True,
+    follow_redirects=False,
 )
+_MAX_REDIRECTS = 5
+
+
+def _is_disallowed_ip(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    return any(
+        (
+            ip.is_private,
+            ip.is_loopback,
+            ip.is_link_local,
+            ip.is_multicast,
+            ip.is_reserved,
+            ip.is_unspecified,
+        )
+    )
+
+
+@lru_cache(maxsize=256)
+def _hostname_resolves_public(hostname: str) -> bool:
+    try:
+        infos = socket.getaddrinfo(hostname, None, type=socket.SOCK_STREAM)
+    except socket.gaierror:
+        # If DNS is unavailable for this host, let the network request fail naturally.
+        return True
+    except Exception:
+        return False
+
+    for info in infos:
+        sockaddr = info[4]
+        if not sockaddr:
+            continue
+        try:
+            addr = ipaddress.ip_address(sockaddr[0])
+        except ValueError:
+            continue
+        if _is_disallowed_ip(addr):
+            return False
+
+    return True
+
+
+def _is_safe_remote_url(url: str) -> bool:
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return False
+    if parsed.username or parsed.password:
+        return False
+    host = (parsed.hostname or "").strip().lower()
+    if not host or host == "localhost":
+        return False
+    try:
+        addr = ipaddress.ip_address(host)
+    except ValueError:
+        return _hostname_resolves_public(host)
+    return not _is_disallowed_ip(addr)
+
+
+def _httpx_get_no_redirect(url: str):
+    try:
+        return _HTTP_CLIENT.get(url, follow_redirects=False)
+    except TypeError:
+        # Compatibility for tests that monkeypatch a simple get(url) callable.
+        return _HTTP_CLIENT.get(url)
+
+
+def _http_get_via_httpx(url: str) -> httpx.Response | None:
+    current = url
+    for _ in range(_MAX_REDIRECTS + 1):
+        if not _is_safe_remote_url(current):
+            logger.warning("Blocked OpenSearch redirect target: %s", current)
+            return None
+        try:
+            candidate = _httpx_get_no_redirect(current)
+        except Exception as exc:  # pragma: no cover - network failure fallback
+            logger.debug("Primary httpx request failed", exc_info=exc)
+            return None
+        if 300 <= candidate.status_code < 400:
+            location = candidate.headers.get("Location")
+            if not location:
+                return None
+            current = urljoin(current, location)
+            continue
+        if candidate.status_code < 400:
+            return candidate
+        return None
+    return None
 
 
 class _SearchLinkParser(HTMLParser):
@@ -130,21 +217,21 @@ def _fetch_html(url: str) -> str | None:
 
 
 def _http_get(url: str) -> httpx.Response | None:
-    resp: httpx.Response | None = None
-    try:
-        candidate = _HTTP_CLIENT.get(url)
-        if candidate.status_code < 400:
-            return candidate
-    except Exception as exc:  # pragma: no cover - network failure fallback
-        logger.debug("Primary httpx request failed", exc_info=exc)
-        candidate = None
+    if not _is_safe_remote_url(url):
+        logger.warning("Blocked OpenSearch fetch to unsafe URL: %s", url)
+        return None
+
+    resp: httpx.Response | None = _http_get_via_httpx(url)
+    if resp is not None:
+        return resp
+
     if curl_requests is not None:
         try:
             alt = curl_requests.get(
                 url,
                 impersonate="chrome120",
                 timeout=OPENSEARCH_TIMEOUT,
-                allow_redirects=True,
+                allow_redirects=False,
             )
             if alt.status_code < 400:
                 return _CurlResponseAdapter(alt)
@@ -157,7 +244,7 @@ def _http_get(url: str) -> httpx.Response | None:
                 url,
                 headers=DEFAULT_HTTP_HEADERS,
                 timeout=OPENSEARCH_TIMEOUT,
-                allow_redirects=True,
+                allow_redirects=False,
             )
             if alt.status_code < 400:
                 return _TlsClientResponseAdapter(alt)
@@ -173,6 +260,7 @@ class _CurlResponseAdapter:
         self.status_code = resp.status_code
         self.content = resp.content
         self.encoding = resp.encoding
+        self.headers = getattr(resp, "headers", {})
 
 
 class _TlsClientResponseAdapter:
@@ -182,6 +270,7 @@ class _TlsClientResponseAdapter:
         self.status_code = resp.status_code
         self.content = resp.content
         self.encoding = resp.encoding or "utf-8"
+        self.headers = getattr(resp, "headers", {})
 
 
 def _opensearch_document_url(link_url: str) -> str | None:
