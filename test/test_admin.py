@@ -42,6 +42,7 @@ def test_admin_error_handler_renders_message(app_ctx):
 def test_admin_config_get_and_post(client, db_conn):
     rv = client.get("/admin/config")
     assert rv.status_code == 200
+    assert b"test-secret-key" in rv.data
 
     ensure_admin_users_schema(db_conn)
     db_conn.execute(
@@ -59,6 +60,7 @@ def test_admin_config_get_and_post(client, db_conn):
         "admin_auth_enabled": "on",
         "fallback_url": "https://duck.example/?q={q}",
         "file_allow": "/data\n/tmp",
+        "secret_key": "updated-secret-key",
         "log_level": "WARNING",
         "log_file": "/data/go-search.log",
     }
@@ -71,6 +73,7 @@ def test_admin_config_get_and_post(client, db_conn):
     assert blob["port"] == 6000
     assert blob["file-allow"] == ["/data", "/tmp"]
     assert blob["admin-auth-enabled"] is True
+    assert blob["secret-key"] == "updated-secret-key"
     assert blob["log-level"] == "WARNING"
     assert blob["log-file"] == "/data/go-search.log"
     assert "db-path" not in blob
@@ -234,6 +237,8 @@ def test_admin_add_validation_and_duplicate(client, db_conn):
     assert rv.status_code == 400
     rv = client.post("/admin/add", data={"keyword": "two words", "url": "https://example.com"})
     assert rv.status_code == 400
+    rv = client.post("/admin/add", data={"keyword": "mail", "url": "mailto:test@example.com"})
+    assert rv.status_code == 400
 
     client.post("/admin/add", data={"keyword": "gh", "url": "https://github.com"})
     rv = client.post("/admin/add", data={"keyword": "gh", "url": "https://github.com"})
@@ -309,6 +314,15 @@ def test_admin_update_validation_and_errors(client):
         },
     )
     assert rv.status_code == 400
+    rv = client.post(
+        "/admin/update",
+        data={
+            "original_keyword": "a",
+            "keyword": "a",
+            "url": "mailto:test@example.com",
+        },
+    )
+    assert rv.status_code == 400
 
 
 def test_admin_list_add_validation_and_duplicates(client):
@@ -356,28 +370,26 @@ def test_admin_list_delete_validation(client):
     assert rv.status_code == 404
 
 
-def test_admin_auth_bootstrap_flow(client, db_conn, test_config):
+def test_admin_auth_first_user_manual_creation_flow(client, db_conn, test_config):
     test_config.admin_auth_enabled = True
 
     rv = client.get("/admin/")
-    assert rv.status_code == 401
-    assert "Basic" in rv.headers.get("WWW-Authenticate", "")
+    assert rv.status_code == 302
+    assert "/admin/users" in rv.headers["Location"]
 
-    bad_header = _basic_auth("bad name", "pass123")
-    rv = client.get("/admin/", headers=bad_header)
-    assert rv.status_code == 401
-    assert db_conn.execute("SELECT COUNT(*) AS c FROM admin_users").fetchone()["c"] == 0
-
-    empty_header = _basic_auth("admin", "")
-    rv = client.get("/admin/", headers=empty_header)
-    assert rv.status_code == 401
-    assert db_conn.execute("SELECT COUNT(*) AS c FROM admin_users").fetchone()["c"] == 0
-
-    header = _basic_auth("admin", "pass123")
-    rv = client.get("/admin/", headers=header)
+    rv = client.get("/admin/users")
     assert rv.status_code == 200
+
+    rv = client.post(
+        "/admin/users/add",
+        data={"username": "admin", "password": "pass123"},
+    )
+    assert rv.status_code == 302
     row = db_conn.execute("SELECT username FROM admin_users").fetchone()
     assert row["username"] == "admin"
+
+    rv = client.get("/admin/", headers=_basic_auth("admin", "pass123"))
+    assert rv.status_code == 200
 
 
 def test_admin_auth_rejects_invalid_and_inactive(client, db_conn, test_config):
@@ -532,3 +544,9 @@ def test_admin_post_redirects_without_auth(client, db_conn, test_config):
     rv = client.post("/admin/add", data={"keyword": "gh", "url": "https://github.com"})
     assert rv.status_code == 302
     assert rv.headers["Location"].endswith("/")
+
+
+def test_admin_post_rejects_missing_csrf(app_ctx):
+    raw_client = app_ctx.test_client()
+    rv = raw_client.post("/admin/add", data={"keyword": "gh", "url": "https://github.com"})
+    assert rv.status_code == 400

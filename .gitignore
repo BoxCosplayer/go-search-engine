@@ -22,4 +22,4 @@ config.json
 *.sqlite
 
 
-/personal-todos.md
+./personal-todos.md

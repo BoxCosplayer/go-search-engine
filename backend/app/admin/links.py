@@ -5,6 +5,7 @@ from flask import redirect, request
 from .. import opensearch
 from ..db import get_db
 from ..search_cache import invalidate_suggestions_cache
+from ..utils import is_supported_redirect_url
 from . import admin_bp
 from .home import admin_error
 
@@ -19,6 +20,8 @@ def admin_add():
         return admin_error("Keyword and URL required", 400)
     if any(ch.isspace() for ch in keyword):
         return admin_error("Keyword cannot contain whitespace", 400)
+    if not is_supported_redirect_url(url):
+        return admin_error("URL must start with http://, https://, or file://", 400)
 
     search_enabled = 0
     opensearch_doc_url = None
@@ -68,6 +71,8 @@ def admin_update():
         return admin_error("original_keyword, keyword and url are required", 400)
     if any(ch.isspace() for ch in keyword):
         return admin_error("Keyword cannot contain whitespace", 400)
+    if not is_supported_redirect_url(url):
+        return admin_error("URL must start with http://, https://, or file://", 400)
 
     search_enabled = 0
     opensearch_doc_url = None

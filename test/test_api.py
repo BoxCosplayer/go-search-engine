@@ -1,4 +1,12 @@
+import base64
+
 from backend.app import api
+from werkzeug.security import generate_password_hash
+
+
+def _basic_auth(username: str, password: str) -> dict[str, str]:
+    token = base64.b64encode(f"{username}:{password}".encode()).decode("utf-8")
+    return {"Authorization": f"Basic {token}"}
 
 
 def test_links_endpoint_lists_existing(client, test_config):
@@ -293,3 +301,29 @@ def test_api_unexpected_error_returns_json(client, monkeypatch):
     rv = client.get("/api/links")
     assert rv.status_code == 500
     assert rv.get_json() == {"error": "internal server error"}
+
+
+def test_api_requires_auth_when_enabled(client, db_conn, test_config):
+    test_config.admin_auth_enabled = True
+    db_conn.execute(
+        "INSERT INTO admin_users(username, password_hash, is_active) VALUES ('admin', ?, 1)",
+        (generate_password_hash("secret"),),
+    )
+    db_conn.commit()
+
+    rv = client.get("/api/links")
+    assert rv.status_code == 401
+    assert "Basic" in rv.headers.get("WWW-Authenticate", "")
+
+    rv = client.get("/api/links", headers=_basic_auth("admin", "wrong"))
+    assert rv.status_code == 401
+
+    rv = client.get("/api/links", headers=_basic_auth("admin", "secret"))
+    assert rv.status_code == 200
+
+
+def test_api_manual_user_creation_required_when_auth_enabled_and_no_users(client, test_config):
+    test_config.admin_auth_enabled = True
+    rv = client.get("/api/links")
+    assert rv.status_code == 401
+    assert b"/admin/users" in rv.data

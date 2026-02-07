@@ -19,6 +19,7 @@ def _config_to_form_data(cfg: GoConfig) -> dict[str, object]:
         "fallback_url": cfg.fallback_url,
         "file_allow": "\n".join(cfg.file_allow),
         "admin_auth_enabled": cfg.admin_auth_enabled,
+        "secret_key": cfg.secret_key,
         "log_level": cfg.log_level,
         "log_file": cfg.log_file,
     }
@@ -46,6 +47,7 @@ def admin_config():
         fallback_url = (request.form.get("fallback_url") or "").strip()
         file_allow_raw = request.form.get("file_allow") or ""
         file_allow_list = [line.strip() for line in file_allow_raw.splitlines() if line.strip()]
+        secret_key = (request.form.get("secret_key") or "").strip()
         log_level = (request.form.get("log_level") or "").strip()
         log_file = (request.form.get("log_file") or "").strip()
 
@@ -57,6 +59,7 @@ def admin_config():
             "fallback_url": fallback_url,
             "file_allow": file_allow_raw,
             "admin_auth_enabled": "admin_auth_enabled" in request.form,
+            "secret_key": secret_key or current_cfg.secret_key,
             "log_level": log_level or current_cfg.log_level,
             "log_file": log_file,
         }
@@ -78,6 +81,7 @@ def admin_config():
             "fallback_url": form_values["fallback_url"],
             "file_allow": file_allow_list,
             "admin_auth_enabled": form_values["admin_auth_enabled"],
+            "secret_key": form_values["secret_key"],
             "log_level": form_values["log_level"],
             "log_file": form_values["log_file"],
         }

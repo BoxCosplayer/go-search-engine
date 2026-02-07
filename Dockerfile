@@ -15,7 +15,7 @@ COPY . .
 RUN if (-not (Test-Path 'config.json') -and (Test-Path 'config-template.txt')) { `
         Copy-Item 'config-template.txt' 'config.json' `
     } elseif (-not (Test-Path 'config.json')) { `
-        '{\"host\":\"127.0.0.1\",\"port\":5000,\"debug\":false,\"allow-files\":false,\"fallback-url\":\"\",\"file-allow\":[]}' `
+        '{\"host\":\"127.0.0.1\",\"port\":5000,\"debug\":false,\"allow-files\":false,\"fallback-url\":\"\",\"file-allow\":[],\"admin-auth-enabled\":false,\"secret-key\":\"\",\"log-level\":\"INFO\",\"log-file\":\"C:\\\\data\\\\go-search-engine.log\"}' `
             | Set-Content -Path 'config.json' -Encoding utf8NoBOM `
     }
 

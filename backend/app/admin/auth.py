@@ -18,8 +18,21 @@ def _auth_failed_redirect():
     return redirect(url_for("index"))
 
 
+def _first_user_setup_redirect(message: str):
+    return redirect(url_for("admin.admin_users", error=message))
+
+
 def _wants_html_prompt() -> bool:
     return request.path.startswith("/admin") and request.method in {"GET", "HEAD"}
+
+
+def _wants_api_prompt() -> bool:
+    return request.path.startswith("/api")
+
+
+def _is_first_user_setup_path() -> bool:
+    path = request.path.rstrip("/")
+    return path in {"/admin/users", "/admin/users/add"}
 
 
 def normalize_username(username: str) -> str:
@@ -79,12 +92,20 @@ def require_admin_auth():
     db = get_db()
     user_count = admin_user_count(db)
 
+    if user_count == 0:
+        if _is_first_user_setup_path():
+            return None
+        message = "No admin users exist. Create the first admin user at /admin/users."
+        if _wants_api_prompt():
+            return _unauthorized(message)
+        if request.path.startswith("/admin"):
+            return _first_user_setup_redirect(message)
+        return _auth_failed_redirect()
+
     auth = request.authorization
     if not auth or not auth.username or auth.password is None:
-        if user_count == 0:
-            if request.path.startswith("/admin"):
-                return _unauthorized("No admin users exist. Provide credentials to bootstrap.")
-            return _auth_failed_redirect()
+        if _wants_api_prompt():
+            return _unauthorized("Unauthorized.")
         if _wants_html_prompt():
             return _unauthorized("Unauthorized.")
         return _auth_failed_redirect()
@@ -92,14 +113,9 @@ def require_admin_auth():
     username = auth.username
     password = auth.password
 
-    if user_count == 0:
-        error = validate_username(username) or validate_password(password)
-        if error:
-            return _unauthorized(error)
-        create_admin_user(db, username, password, active=True)
-        return None
-
     if not verify_admin_credentials(db, username, password):
+        if _wants_api_prompt():
+            return _unauthorized("Unauthorized.")
         if _wants_html_prompt():
             return _unauthorized("Unauthorized.")
         return _auth_failed_redirect()

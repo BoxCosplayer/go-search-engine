@@ -12,12 +12,21 @@ from flask import Blueprint, Response, abort, g, redirect, request, url_for
 from werkzeug.exceptions import BadRequest, HTTPException
 
 from .. import opensearch
+from ..admin.auth import require_admin_auth
 from ..db import get_db
 from ..search_cache import get_cached_suggestions, invalidate_suggestions_cache
-from ..utils import sanitize_query, to_slug
+from ..utils import is_supported_redirect_url, sanitize_query, to_slug
 
 api_bp = Blueprint("api", __name__)
 logger = logging.getLogger(__name__)
+
+
+@api_bp.before_request
+def _api_require_auth():
+    auth_result = require_admin_auth()
+    if auth_result is not None:
+        return auth_result
+    return None
 
 
 @api_bp.before_request
@@ -235,6 +244,8 @@ def _import_shortcuts_from_csv(db, file_storage):
             keyword = (row.get("keyword") or "").strip()
             url = (row.get("url") or "").strip()
             if not keyword or not url:
+                continue
+            if not is_supported_redirect_url(url):
                 continue
             title = (row.get("title") or "").strip()
             search_enabled = 0

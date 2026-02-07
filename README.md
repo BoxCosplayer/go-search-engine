@@ -2,7 +2,7 @@
 
 ## Local keyword redirects with a lightweight admin UI and API
 
-Run a local Flask server that lets you type `go <keyword>` (or `go !keyword [search-term]`) in your browser address bar and jump to saved destinations. It ships with a no-auth admin UI, a JSON API, optional search bangs via OpenSearch, and optional file launches guarded by a whitelist. It is currently intended for localhost usage and can run from source, Docker, or a bundled EXE.
+Run a local Flask server that lets you type `go <keyword>` (or `go !keyword [search-term]`) in your browser address bar and jump to saved destinations. It ships with an admin UI, a JSON API, optional search bangs via OpenSearch, and optional file launches guarded by a whitelist. It is currently intended for localhost usage and can run from source, Docker, or a bundled EXE.
 
 ## Demonstration
 
@@ -12,7 +12,7 @@ Youtube demonstration currently in the works.
 
 1. Download the latest `go-server.exe` from the Releases page.
 2. Run it from an empty folder. Runtime files live under `%APPDATA%\go-search-engine` (Windows) or `~/.local/share/go-search-engine` (Linux), including `config.json`, `links.db`, and `go-search-engine.log`.
-3. Edit `config.json` (host, port, debug, allow-files, file-allow, fallback-url, admin-auth-enabled, log-level, log-file) and restart the binary.
+3. Edit `config.json` (host, port, debug, allow-files, file-allow, fallback-url, admin-auth-enabled, secret-key, log-level, log-file) and restart the binary.
 4. Open `http://127.0.0.1:5000/admin` to add shortcuts and lists.
    - When the database starts empty, the app seeds `home`, `lists`, and `admin` shortcuts pointing at the configured host/port.
 
@@ -98,7 +98,10 @@ python -m backend
 
 The local server runs under Waitress (no Flask dev reloader). It uses `config.json` for host and port, and stores data/logs in the user data directory unless `GO_DB_PATH` or `GO_LOG_PATH` is set. Use `GO_CONFIG_PATH` to point at a different config file.
 
-When `admin-auth-enabled` is true, `/admin` requires HTTP Basic Auth. If no admin users exist yet, the first successful Basic Auth attempt will create the initial user. Manage additional users at `http://127.0.0.1:5000/admin/users`.
+When `admin-auth-enabled` is true, `/admin` and `/api` require HTTP Basic Auth.
+If no admin users exist, only `http://127.0.0.1:5000/admin/users` is accessible; use it to create the first admin user manually.
+If `secret-key` is empty, the app generates and saves one on first run. You can also set `GO_SECRET_KEY` or edit `secret-key` from the Admin config page.
+Manage additional users at `http://127.0.0.1:5000/admin/users`.
 
 ## How does this work?
 

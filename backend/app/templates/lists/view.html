@@ -141,6 +141,7 @@
       <a class="btn" href="/lists">All lists</a>
       <form action="/admin/list-delete" method="post"
         onsubmit="return confirm('Delete list {{ list['name'] }}? This only removes the list and its associations, not your links.');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="slug" value="{{ list['slug'] }}">
         <button class="btn btn-danger" type="submit">Delete list</button>
       </form>

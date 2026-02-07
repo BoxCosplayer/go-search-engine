@@ -38,6 +38,7 @@ function Initialize-Config {
             'fallback-url' = ''
             'file-allow'   = @()
             'admin-auth-enabled' = $false
+            'secret-key' = ''
             'log-level'    = 'INFO'
             'log-file'     = 'C:\data\go-search-engine.log'
         }
@@ -57,6 +58,10 @@ function Initialize-Config {
             'allow-files'  = $false
             'fallback-url' = ''
             'file-allow'   = @()
+            'admin-auth-enabled' = $false
+            'secret-key' = ''
+            'log-level' = 'INFO'
+            'log-file' = 'C:\data\go-search-engine.log'
         }
     }
 

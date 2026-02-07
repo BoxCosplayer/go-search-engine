@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import hmac
 import json
 import logging
 import os
+import secrets
 import sqlite3
 import sys
 import threading
@@ -11,7 +13,7 @@ from functools import wraps
 from pathlib import Path
 from urllib.parse import quote_plus
 
-from flask import Flask, abort, redirect, render_template, request, url_for
+from flask import Flask, abort, redirect, render_template, request, session, url_for
 
 from . import opensearch
 from .admin import admin_bp
@@ -35,7 +37,9 @@ from .utils import (
     file_url_to_path,
     get_log_level,
     get_log_path,
+    get_secret_key,
     is_allowed_path,
+    is_supported_redirect_url,
     open_path_with_os,
     sanitize_query,
 )
@@ -61,6 +65,8 @@ logger = logging.getLogger(__name__)
 _logging_configured = False
 _logging_log_path = ""
 _logging_log_level = ""
+_CSRF_SESSION_KEY = "_csrf_token"
+_CSRF_PROTECTED_PATHS = {"/import/shortcuts"}
 
 
 def _ensure_logging():
@@ -82,6 +88,32 @@ PORT = config.port
 DEBUG = config.debug
 FALLBACK_URL_TEMPLATE = config.fallback_url  # e.g. "https://duckduckgo.com/?q={q}"
 ALLOW_FILES = config.allow_files
+
+
+def _resolve_secret_key() -> str:
+    configured = get_secret_key()
+    if configured:
+        return configured
+    ephemeral = secrets.token_urlsafe(32)
+    logger.warning(
+        "No secret key configured. Generated an ephemeral key; set GO_SECRET_KEY or secret-key in config.json."
+    )
+    return ephemeral
+
+
+def _csrf_token() -> str:
+    token = session.get(_CSRF_SESSION_KEY)
+    if token:
+        return token
+    token = secrets.token_urlsafe(32)
+    session[_CSRF_SESSION_KEY] = token
+    return token
+
+
+def _requires_csrf_protection() -> bool:
+    if request.method not in {"POST", "PUT", "PATCH", "DELETE"}:
+        return False
+    return request.path.startswith("/admin") or request.path in _CSRF_PROTECTED_PATHS
 
 
 def _require_pillow_modules():
@@ -183,13 +215,27 @@ else:
     _TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), "templates")
 
 app = Flask(__name__, template_folder=_TEMPLATES_DIR)
+app.secret_key = _resolve_secret_key()
 app.debug = DEBUG
+app.jinja_env.globals["csrf_token"] = _csrf_token
 db_init_app(app)
 
 
 @app.before_request
 def _configure_logging_once():
     _ensure_logging()
+
+
+@app.before_request
+def _verify_csrf_token():
+    if not _requires_csrf_protection():
+        return
+    expected = session.get(_CSRF_SESSION_KEY)
+    provided = (request.form.get("csrf_token") or request.headers.get("X-CSRF-Token") or "").strip()
+    if not expected:
+        abort(400, "Missing CSRF session token.")
+    if not provided or not hmac.compare_digest(provided, expected):
+        abort(400, "Invalid CSRF token.")
 
 
 def _admin_only(view_func):
@@ -214,6 +260,10 @@ app.add_url_rule("/opensearch/suggest", view_func=opensearch_suggest)
 
 
 def _redirect_to_url(url: str):
+    if not is_supported_redirect_url(url):
+        logger.warning("Redirect rejected (unsupported scheme) url=%s", url)
+        return ("Unsupported URL scheme. Allowed: http://, https://, file://", 400)
+
     if url.startswith(("http://", "https://")):
         return redirect(url, code=302)
 
@@ -252,7 +302,7 @@ def _redirect_to_url(url: str):
         logger.info("File access opened path=%s remote=%s", path, remote)
         return render_template("file_open.html", path=path), 200
 
-    return redirect(url, code=302)
+    return ("Unsupported URL scheme. Allowed: http://, https://, file://", 400)
 
 
 def _handle_bang_query(db, query: str):
