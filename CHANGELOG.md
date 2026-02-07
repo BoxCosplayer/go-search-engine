@@ -2,6 +2,10 @@
 
 ## [Major Versions Log](#major-versions-log)
 
+## 1.3.3 - 03/02/2026
+
+- Switched the local/EXE server to Waitress for better concurrency.
+
 ## 1.3.2 - 03/02/2026
 
 - Enforced SQLite FTS5 trigram support at startup; app now fails fast when unavailable.
